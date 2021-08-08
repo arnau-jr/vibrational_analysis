@@ -20,10 +20,10 @@ module force_field
 
       !Coefficients for every type of potential supported, not all will be used at runtime
       real*8,allocatable  :: harmonic_stretching(:,:) !Harmonic stretching (k,r)
-      real*8,allocatable  :: morse_stretching(:,:) !Morse stretching (De,r,beta)
+      real*8,allocatable  :: morse_stretching(:,:) !Morse stretching (De,beta,r)
       real*8,allocatable  :: harmonic_bending(:,:) !Harmonic angles (k,a)
-      real*8,allocatable  :: cosine_torsions(:,:) !Cosine torsions (An,n,delta)
-      real*8,allocatable  :: cosine_impropers(:,:) !Cosine impropers (An,n,delta)
+      real*8,allocatable  :: cosine_torsions(:,:) !Cosine torsions (An,delta,n)
+      real*8,allocatable  :: cosine_impropers(:,:) !Cosine impropers (An,delta,n)
 
       !Unit conversions and other constants
       real*8,parameter :: kcal_to_kj = 4.184d0
@@ -35,11 +35,17 @@ module force_field
 
       contains
 
-      subroutine init_forcefield(unit)
+      subroutine init_forcefield(unit,Natoms,xyz)
             implicit none
-            integer,intent(in) :: unit
+            integer,intent(in) :: unit,Natoms
+            real*8,intent(in)  :: xyz(3,Natoms)
             character          :: dummy*90,units*90,pot_type*1
             integer            :: i,a,b,c,d,dummy2
+
+            if(Natoms == 0) then
+                  print*,"Molecule has 0 atoms, not initialized correctly, aborting..."
+                  stop
+            end if
 
             !Initialize
             Nbonds = 0
@@ -89,7 +95,7 @@ module force_field
 
             allocate(angle_pairs(3,Nangles),angle_vals(Nangles))
             if(pot_type=="H") then
-                  allocate(harmonic_bending(2,Nbonds))
+                  allocate(harmonic_bending(2,Nangles))
             else
                   print*,"Bending potential not supported, aborting..."
                   stop
@@ -115,7 +121,7 @@ module force_field
 
             allocate(torsion_pairs(4,Ntorsions),torsion_vals(Ntorsions))
             if(pot_type=="C") then
-                  allocate(cosine_torsions(4,Nbonds))
+                  allocate(cosine_torsions(3,Ntorsions))
             else
                   print*,"Torsion potential not supported, aborting..."
                   stop
@@ -125,7 +131,7 @@ module force_field
             do i=1,Ntorsions
                   if(pot_type=="C") then
                         read(unit,*)a,b,c,d,dummy,dummy2,cosine_torsions(1,i),cosine_torsions(2,i),&
-                        cosine_torsions(3,i),cosine_torsions(4,i)
+                        cosine_torsions(3,i)
                         if(units=="KC") then
                               cosine_torsions(1,i) = cosine_torsions(1,i)*kcal_to_kj
                         endif
@@ -139,8 +145,9 @@ module force_field
             read(unit,*)pot_type
             read(unit,*)units
 
+            allocate(improper_pairs(4,Nimpropers),improper_vals(Nimpropers))
             if(pot_type=="C") then
-                  allocate(cosine_impropers(4,Nbonds))
+                  allocate(cosine_impropers(3,Nimpropers))
             else
                   print*,"Improper potential not supported, aborting..."
                   stop
@@ -150,16 +157,17 @@ module force_field
             do i=1,Nimpropers
                   if(pot_type=="C") then
                         read(unit,*)a,b,c,d,dummy,cosine_impropers(1,i),cosine_impropers(2,i),&
-                        cosine_impropers(3,i),cosine_impropers(4,i)
+                        cosine_impropers(3,i)
                         if(units=="KC") then
                               cosine_impropers(1,i) = cosine_impropers(1,i)*kcal_to_kj
                         endif
                   end if
-                  improper_pairs(i,:) = (/a,b,c,d/)
+                  improper_pairs(:,i) = (/a,b,c,d/)
                   ! improper_vals(i) = get_improper(xyz(:,a),xyz(:,b),&
                   ! xyz(:,c),xyz(:,d))
             enddo
             10 continue
+            call get_all(Natoms,xyz)
       end subroutine init_forcefield
 
       function unit_cross(u1,u2) result(u3)
@@ -301,8 +309,8 @@ module force_field
             integer            :: bond
 
             do bond=1,Nbonds
-                  bond_vals(bond) = get_dist(xyz(:,bond_pairs(bond,1)),&
-                  xyz(:,bond_pairs(bond,2)))
+                  bond_vals(bond) = get_dist(xyz(:,bond_pairs(1,bond)),&
+                  xyz(:,bond_pairs(2,bond)))
             enddo
       end subroutine get_bonds
 
@@ -313,8 +321,8 @@ module force_field
             integer            :: angle
 
             do angle=1,Nangles
-                  angle_vals(angle) = get_angle(xyz(:,angle_pairs(angle,1)),&
-                  xyz(:,angle_pairs(angle,2)),xyz(:,angle_pairs(angle,3)))
+                  angle_vals(angle) = get_angle(xyz(:,angle_pairs(1,angle)),&
+                  xyz(:,angle_pairs(2,angle)),xyz(:,angle_pairs(3,angle)))
             enddo
       end subroutine get_angles
 
@@ -325,10 +333,10 @@ module force_field
             integer            :: torsion
 
             do torsion=1,Ntorsions
-                  torsion_vals(torsion) = get_torsion(xyz(:,torsion_pairs(torsion,1)),&
-                  xyz(:,torsion_pairs(torsion,2)),&
-                  xyz(:,torsion_pairs(torsion,3)),&
-                  xyz(:,torsion_pairs(torsion,4)))
+                  torsion_vals(torsion) = get_torsion(xyz(:,torsion_pairs(1,torsion)),&
+                  xyz(:,torsion_pairs(2,torsion)),&
+                  xyz(:,torsion_pairs(3,torsion)),&
+                  xyz(:,torsion_pairs(4,torsion)))
             enddo
       end subroutine get_torsions
 
@@ -339,10 +347,10 @@ module force_field
             integer            :: improper
 
             do improper=1,Nimpropers
-                  improper_vals(improper) = get_improper(xyz(:,improper_pairs(improper,1)),&
-                  xyz(:,improper_pairs(improper,2)),&
-                  xyz(:,improper_pairs(improper,3)),&
-                  xyz(:,improper_pairs(improper,4)))
+                  improper_vals(improper) = get_improper(xyz(:,improper_pairs(1,improper)),&
+                  xyz(:,improper_pairs(2,improper)),&
+                  xyz(:,improper_pairs(3,improper)),&
+                  xyz(:,improper_pairs(4,improper)))
             enddo
       end subroutine get_impropers
 
@@ -371,9 +379,9 @@ module force_field
             elseif(pot_types(1)=="M") then
                   do i=1,Nbonds
                         De = morse_stretching(1,i)
-                        req = morse_stretching(2,i)
-                        beta = morse_stretching(3,i)
-                        ! E = E + De(i)*((1.d0-exp(-beta(i)*(bond_vals(i)-req(i))))**2-1.d0)
+                        beta = morse_stretching(2,i)
+                        req = morse_stretching(3,i)
+                        ! E = E + De*((1.d0-exp(-beta*(bond_vals(i)-req)))**2-1.d0)
                         E = E + De*((1.d0-exp(-beta*(bond_vals(i)-req)))**2)
                   enddo
             endif
@@ -403,8 +411,8 @@ module force_field
             if(pot_types(3)=="C") then
                   do i=1,Ntorsions
                         An = cosine_torsions(1,i)
-                        n = cosine_torsions(2,i)
-                        delta = cosine_torsions(3,i)
+                        delta = cosine_torsions(2,i)
+                        n = cosine_torsions(3,i)
                         E = E + An*(1. + cos((pi/180.d0)*(n*torsion_vals(i) - delta)))
                   enddo
             end if
@@ -418,8 +426,8 @@ module force_field
             if(pot_types(4)=="C") then
                   do i=1,Nimpropers
                         An = cosine_impropers(1,i)
-                        n = cosine_impropers(2,i)
-                        delta = cosine_impropers(3,i)
+                        delta = cosine_impropers(2,i)
+                        n = cosine_impropers(3,i)
                         E = E + An*(1. + cos((pi/180.d0)*(n*improper_vals(i) - delta)))
                   enddo
             end if
@@ -434,6 +442,8 @@ module force_field
                   if(recomp_flag) then
                         call get_all(Natoms,xyz)
                   end if
+            else
+                  call get_all(Natoms,xyz)
             endif
 
             E = 0.
