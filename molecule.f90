@@ -87,10 +87,10 @@ module molecule
             eq_cm_pos = cm_pos
       end subroutine init_molecule
 
-      subroutine get_normal_modes()
+      subroutine comp_normal_modes()
             implicit none
             !TODO
-      end subroutine get_normal_modes
+      end subroutine comp_normal_modes
 
 
 

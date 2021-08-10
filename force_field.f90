@@ -86,7 +86,7 @@ module force_field
                   end if
                   bond_pairs(:,i) = (/a,b/)
             end do
-            read(unit,*,end=10) !Check if end fiel, blank line should be there if continuing
+            read(unit,*,end=10) !Check if end file, blank line should be there if continuing
 
             !Read bending info
             read(unit,*)Nangles
@@ -163,11 +163,11 @@ module force_field
                         endif
                   end if
                   improper_pairs(:,i) = (/a,b,c,d/)
-                  ! improper_vals(i) = get_improper(xyz(:,a),xyz(:,b),&
+                  ! improper_vals(i) = comp_improper(xyz(:,a),xyz(:,b),&
                   ! xyz(:,c),xyz(:,d))
             enddo
             10 continue
-            call get_all(Natoms,xyz)
+            call comp_all(Natoms,xyz)
       end subroutine init_forcefield
 
       function unit_cross(u1,u2) result(u3)
@@ -192,21 +192,21 @@ module force_field
             v3(3) =   v1(1)*v2(2) - v1(2)*v2(1)
       end function cross_product
 
-      function get_norm(u) result(a)
+      function comp_norm(u) result(a)
             implicit none
             real*8 :: u(:),a
             a = sqrt(sum(u**2))
-      end function get_norm
+      end function comp_norm
 
-      function get_dist(c1,c2) result (d)
+      function comp_dist(c1,c2) result (d)
             implicit none
             real*8 :: c1(3),c2(3)
             real*8 :: d
 
             d = sqrt(sum((c1-c2)**2))
-      end function get_dist
+      end function comp_dist
 
-      function get_angle(c1,c2,c3) result(A)
+      function comp_angle(c1,c2,c3) result(A)
             implicit none
             real*8 :: c1(3),c2(3),c3(3)
             real*8 :: u1(3),u2(3),proj
@@ -226,9 +226,9 @@ module force_field
             else
                   A = 180.d0 - (180.d0/pi)*acos(proj)
             endif
-      end function get_angle
+      end function comp_angle
 
-      function get_torsion(c1,c2,c3,c4) result(T)
+      function comp_torsion(c1,c2,c3,c4) result(T)
             implicit none
             real*8 :: c1(3),c2(3),c3(3),c4(3)
             real*8 :: u12(3),u23(3),u32(3),u43(3)
@@ -266,9 +266,9 @@ module force_field
             else
                   T = (180.d0/pi)*sign(1.d0,-proj2)*acos(proj)
             endif
-      end function get_torsion
+      end function comp_torsion
 
-      function get_improper(c4,c1,c3,c2) result(T)
+      function comp_improper(c4,c1,c3,c2) result(T)
             implicit none
             real*8 :: c1(3),c2(3),c3(3),c4(3)
             real*8 :: u12(3),u23(3),u32(3),u43(3)
@@ -300,69 +300,69 @@ module force_field
             else
                   T = (180.d0/pi)*sign(1.d0,-proj2)*acos(proj)
             endif
-      end function get_improper
+      end function comp_improper
 
-      subroutine get_bonds(Natoms,xyz)
+      subroutine comp_bonds(Natoms,xyz)
             implicit none
             integer,intent(in) :: Natoms
             real*8,intent(in)  :: xyz(3,Natoms)
             integer            :: bond
 
             do bond=1,Nbonds
-                  bond_vals(bond) = get_dist(xyz(:,bond_pairs(1,bond)),&
+                  bond_vals(bond) = comp_dist(xyz(:,bond_pairs(1,bond)),&
                   xyz(:,bond_pairs(2,bond)))
             enddo
-      end subroutine get_bonds
+      end subroutine comp_bonds
 
-       subroutine get_angles(Natoms,xyz)
+       subroutine comp_angles(Natoms,xyz)
             implicit none
             integer,intent(in) :: Natoms
             real*8,intent(in)  :: xyz(3,Natoms)
             integer            :: angle
 
             do angle=1,Nangles
-                  angle_vals(angle) = get_angle(xyz(:,angle_pairs(1,angle)),&
+                  angle_vals(angle) = comp_angle(xyz(:,angle_pairs(1,angle)),&
                   xyz(:,angle_pairs(2,angle)),xyz(:,angle_pairs(3,angle)))
             enddo
-      end subroutine get_angles
+      end subroutine comp_angles
 
-      subroutine get_torsions(Natoms,xyz)
+      subroutine comp_torsions(Natoms,xyz)
             implicit none
             integer,intent(in) :: Natoms
             real*8,intent(in)  :: xyz(3,Natoms)
             integer            :: torsion
 
             do torsion=1,Ntorsions
-                  torsion_vals(torsion) = get_torsion(xyz(:,torsion_pairs(1,torsion)),&
+                  torsion_vals(torsion) = comp_torsion(xyz(:,torsion_pairs(1,torsion)),&
                   xyz(:,torsion_pairs(2,torsion)),&
                   xyz(:,torsion_pairs(3,torsion)),&
                   xyz(:,torsion_pairs(4,torsion)))
             enddo
-      end subroutine get_torsions
+      end subroutine comp_torsions
 
-      subroutine get_impropers(Natoms,xyz)
+      subroutine comp_impropers(Natoms,xyz)
             implicit none
             integer,intent(in) :: Natoms
             real*8,intent(in)  :: xyz(3,Natoms)
             integer            :: improper
 
             do improper=1,Nimpropers
-                  improper_vals(improper) = get_improper(xyz(:,improper_pairs(1,improper)),&
+                  improper_vals(improper) = comp_improper(xyz(:,improper_pairs(1,improper)),&
                   xyz(:,improper_pairs(2,improper)),&
                   xyz(:,improper_pairs(3,improper)),&
                   xyz(:,improper_pairs(4,improper)))
             enddo
-      end subroutine get_impropers
+      end subroutine comp_impropers
 
-      subroutine get_all(Natoms,xyz)
+      subroutine comp_all(Natoms,xyz)
             implicit none
             integer,intent(in) :: Natoms
             real*8,intent(in)  :: xyz(3,Natoms)
-            call get_bonds    (Natoms,xyz)
-            call get_angles   (Natoms,xyz)
-            call get_torsions (Natoms,xyz)
-            call get_impropers(Natoms,xyz)
-      end subroutine get_all
+            call comp_bonds    (Natoms,xyz)
+            call comp_angles   (Natoms,xyz)
+            call comp_torsions (Natoms,xyz)
+            call comp_impropers(Natoms,xyz)
+      end subroutine comp_all
 
       real*8 function comp_bonds_energy() result(E)
             implicit none
@@ -440,10 +440,10 @@ module force_field
             logical,optional   :: recomp_flag
             if(present(recomp_flag))then
                   if(recomp_flag) then
-                        call get_all(Natoms,xyz)
+                        call comp_all(Natoms,xyz)
                   end if
             else
-                  call get_all(Natoms,xyz)
+                  call comp_all(Natoms,xyz)
             endif
 
             E = 0.
@@ -452,6 +452,103 @@ module force_field
             E = E + comp_torsions_energy()
             E = E + comp_impropers_energy()
       end function comp_energy
+
+      function build_gradient(Natoms,xyz) result(G)
+                  implicit none
+                  integer :: Natoms
+                  real*8 :: xyz(3,Natoms),xyz_mod(3,Natoms)
+                  real*8 :: G(3,Natoms)
+                  real*8,parameter :: hi = 5.d-6
+                  real*8 :: Vp,Vm
+                  integer :: a,p
+
+                  G = 0.d0
+                  do a=1,Natoms
+                        do p=1,3
+                              xyz_mod = xyz
+                              xyz_mod(p,a) = xyz(p,a) + hi
+
+                              Vp = comp_energy(Natoms,xyz_mod)
+
+                              xyz_mod = xyz
+                              xyz_mod(p,a) = xyz(p,a) - hi
+
+                              Vm = comp_energy(Natoms,xyz_mod)
+
+                              G(p,a) = (Vp-Vm)/(2.d0*hi)
+                        end do
+
+                  end do
+                  call comp_all(Natoms,xyz)
+      end function build_gradient
+
+      function build_hessian(Natoms,xyz) result(H)
+                  implicit none
+                  integer :: Natoms
+                  real*8 :: xyz(3,Natoms),xyz_mod(3,Natoms)
+                  real*8 :: H(3*Natoms,3*Natoms)
+                  real*8,parameter :: hi = 5.d-6,hj = 5.d-6
+                  ! real*8,parameter :: hi = 1.d-5,hj = 1.d-5
+                  real*8 :: V,Vpp,Vmm,Vpm,Vmp
+                  integer :: a,b,p,q,i,j
+
+                  H = 0.d0
+                  do a=1,Natoms
+                        do b=1,Natoms
+                              do p=0,2
+                              do q=0,2
+                              i = 3*a - p
+                              j = 3*b - q
+                              
+                              if(i/=j) then
+                              xyz_mod = xyz
+                              xyz_mod(3-p,a) = xyz(3-p,a) + hi
+                              xyz_mod(3-q,b) = xyz(3-q,b) + hj
+                              Vpp = comp_energy(Natoms,xyz_mod)
+
+
+                              xyz_mod = xyz
+                              xyz_mod(3-p,a) = xyz(3-p,a) - hi
+                              xyz_mod(3-q,b) = xyz(3-q,b) - hj
+                              Vmm = comp_energy(Natoms,xyz_mod)
+
+
+                              xyz_mod = xyz
+                              xyz_mod(3-p,a) = xyz(3-p,a) + hi
+                              xyz_mod(3-q,b) = xyz(3-q,b) - hj
+                              Vpm = comp_energy(Natoms,xyz_mod)
+
+
+                              xyz_mod = xyz
+                              xyz_mod(3-p,a) = xyz(3-p,a) - hi
+                              xyz_mod(3-q,b) = xyz(3-q,b) + hj
+                              Vmp = comp_energy(Natoms,xyz_mod)
+
+                              H(i,j) = (Vpp - Vpm - Vmp + Vmm)/(4.d0*hi*hj)
+                              else
+
+                              xyz_mod = xyz
+                              xyz_mod(3-p,a) = xyz(3-p,a) + hi
+                              Vpp = comp_energy(Natoms,xyz_mod)
+
+
+                              xyz_mod = xyz
+                              xyz_mod(3-p,a) = xyz(3-p,a) - hi
+                              Vmm = comp_energy(Natoms,xyz_mod)
+
+
+                              xyz_mod = xyz
+                              V = comp_energy(Natoms,xyz_mod)
+
+                              H(i,j) = (Vpp - 2.d0*V + Vmm)/(hi*hj)
+                              
+                              end if
+                              end do
+                              end do
+                        end do
+                  end do
+                  call comp_all(Natoms,xyz)
+      end function build_hessian
 
 
 
