@@ -215,8 +215,8 @@ module force_field
             u1 = c2-c1
             u2 = c3-c2
 
-            u1 = u1/sqrt(sum(u1**2))
-            u2 = u2/sqrt(sum(u2**2))
+            u1 = u1/comp_norm(u1)
+            u2 = u2/comp_norm(u2)
 
             proj = sum(u1*u2)
             if(proj>=1.d0) then
