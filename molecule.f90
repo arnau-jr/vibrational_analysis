@@ -17,8 +17,6 @@ module molecule
       real*8             :: cm_pos(3)
       real*8,allocatable :: xyz_eq(:,:) !Equilibrium coordinates in CoM frame
       real*8             :: eq_cm_pos(3)
-      !Normal coordinate analysis
-      real*8,allocatable :: normal_base(:,:)
 
       contains
 
@@ -86,12 +84,6 @@ module molecule
             xyz_eq = xyz_cm
             eq_cm_pos = cm_pos
       end subroutine init_molecule
-
-      subroutine comp_normal_modes()
-            implicit none
-            !TODO
-      end subroutine comp_normal_modes
-
 
 
 end module molecule
