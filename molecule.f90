@@ -2,7 +2,6 @@ module molecule
       implicit none 
 
       !Constants and parameters
-      real*8,parameter :: PI = 4.d0*atan(1.d0)
       real*8,parameter :: atomic_mass(10) = (/1.00782522,0.,0.,0.,0.,12.01,14.01,15.99491502,0.,0./)!TBD
 
       !Atom information
@@ -25,6 +24,10 @@ module molecule
       real*8             :: cm_vel(3),omega_mol(3)
       real*8,allocatable :: vel_vib(:,:) !Vibrational velocities
 
+
+      !Format labels for outputting normal mode energies
+
+      character :: normal_format_label*90
       contains
 
       subroutine parse_atomic_symbol()
@@ -76,7 +79,7 @@ module molecule
             read(unit,*)
             !Allocate quantities
             allocate(S_mol(Natoms),M_mol(Natoms),Z_mol(Natoms))
-            allocate(xyz_mol(3,Natoms),xyz_cm(3,Natoms))
+            allocate(xyz_mol(3,Natoms),xyz_cm(3,Natoms),xyz_eckart(3,Natoms))
             allocate(vel_mol(3,Natoms),vel_cm(3,Natoms),vel_vib(3,Natoms))
 
             !Read the atoms themselves
@@ -91,7 +94,23 @@ module molecule
             call update_cm_coords()
             xyz_eq = xyz_cm
             eq_cm_pos = cm_pos
+
+            write(normal_format_label,"(A,I2,A)")"(I5,2X,",3*Natoms,"(E14.7,2X))"
       end subroutine init_molecule
+
+
+      subroutine write_conf(r,port)
+            implicit none
+            integer,intent(in) :: port
+            real*8,intent(in)  :: r(3,Natoms)
+            integer            :: i
+
+            write(port,"(I5)")Natoms
+            write(port,*)""
+            do i=1,Natoms
+                  write(port,"(A,2X,E20.10,2X,E20.10,2X,E20.10)")S_mol(i),r(:,i)
+            enddo
+      end
 
 
 end module molecule
