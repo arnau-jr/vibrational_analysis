@@ -279,10 +279,10 @@ module vibration
 
       function comp_cm_energy(vel) result(Ecm)
             implicit none
-            real*8 :: vel(3,Natoms),vel_cm(3)
+            real*8 :: vel(3,Natoms)
             real*8 :: Ecm
-            vel_cm = comp_cm_vel(vel)
-            Ecm = 0.5d0*sum(M_mol)*sum(vel_cm**2)
+            cm_vel = comp_cm_vel(vel)
+            Ecm = 0.5d0*sum(M_mol)*sum(cm_vel**2)
       end function comp_cm_energy
 
       function comp_pseudo_angular_moment(vel) result(l)
@@ -322,5 +322,46 @@ module vibration
             end do
             Erot = 0.5d0*Erot
       end function comp_rotational_energy
+
+      subroutine kinetic_energy_analysis(Ecm,Erot,Evib,Ecor)
+            implicit none
+            real*8,intent(out) :: Ecm,Erot,Evib,Ecor
+            integer            :: i
+
+            Ecm  = comp_cm_energy(vel_mol)
+
+            omega_mol = comp_angular_vel(vel_mol)
+            Erot = comp_rotational_energy(omega_mol)
+
+            Evib = 0.d0
+            Ecor = 0.d0
+            do i=1,Natoms
+                  vel_vib(:,i) = vel_mol(:,i) - comp_cm_vel(vel_mol) &
+                  - cross_product(omega_mol,xyz_cm(:,i))
+                  Evib = Evib + M_mol(i)*sum(vel_vib(:,i)**2)
+
+                  Ecor = Ecor + M_mol(i)*sum(vel_mol(:,i)*cross_product(omega_mol,xyz_cm(:,i)))
+            end do
+            Evib = 0.5d0*Evib
+      end subroutine kinetic_energy_analysis
+
+      subroutine comp_normal_energy(KNM,UNM)
+            implicit none
+            real*8,intent(out) :: KNM(3*Natoms),UNM(3*Natoms)
+            real*8             :: vel_nm(3*Natoms)
+            real*8             :: disp(3,Natoms),disp_nm(3*Natoms)  
+            
+            !Kinetic part
+            vel_nm = cart_to_normal(vel_vib)
+
+            KNM = 0.5d0*vel_nm**2
+
+            !Potential part
+
+            disp = xyz_cm - xyz_eckart
+            disp_nm = cart_to_normal(disp)
+
+            UNM = 0.5d0*normal_eigenvalues*(disp_nm)**2
+end subroutine comp_normal_energy
 
 end module vibration

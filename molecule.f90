@@ -19,6 +19,12 @@ module molecule
       real*8             :: eq_cm_pos(3)
       real*8,allocatable :: xyz_eckart(:,:) !Equilibirum coordinates in the Eckart frame
 
+      !Velocities
+      real*8,allocatable :: vel_mol(:,:) !Instantaneous velocities
+      real*8,allocatable :: vel_cm(:,:) !Instantaneous velocities in CoM frame
+      real*8             :: cm_vel(3),omega_mol(3)
+      real*8,allocatable :: vel_vib(:,:) !Vibrational velocities
+
       contains
 
       subroutine parse_atomic_symbol()
@@ -71,6 +77,7 @@ module molecule
             !Allocate quantities
             allocate(S_mol(Natoms),M_mol(Natoms),Z_mol(Natoms))
             allocate(xyz_mol(3,Natoms),xyz_cm(3,Natoms))
+            allocate(vel_mol(3,Natoms),vel_cm(3,Natoms),vel_vib(3,Natoms))
 
             !Read the atoms themselves
             do i = 1,Natoms
