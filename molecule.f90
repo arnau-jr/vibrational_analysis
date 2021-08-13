@@ -17,6 +17,7 @@ module molecule
       real*8,allocatable :: xyz_eq(:,:) !Equilibrium coordinates in CoM frame
       real*8             :: eq_cm_pos(3)
       real*8,allocatable :: xyz_eckart(:,:) !Equilibirum coordinates in the Eckart frame
+      real*8             :: U_eckart(3,3) !Rotation matrix that transforms from the eckart frame to the original equilibrium frame
 
       !Velocities
       real*8,allocatable :: vel_mol(:,:) !Instantaneous velocities

@@ -171,7 +171,7 @@ module vibration
             U(3,3) = q0**2 - q1**2 - q2**2 + q3**2
       end function build_direction_cosine_matrix
 
-      subroutine get_eckart_frame(U)
+      subroutine get_eckart_frame()
             implicit none
             real*8             :: EM(4,4),U(3,3)
             real*8             :: work(100),d(4)
@@ -189,6 +189,7 @@ module vibration
                   xyz_eckart(:,i) = matmul(transpose(U),xyz_eq(:,i))
             end do
             call check_eckart_conditions()
+            U_eckart = U
       end subroutine get_eckart_frame
 
       subroutine check_eckart_conditions()
@@ -348,20 +349,80 @@ module vibration
       subroutine comp_normal_energy(KNM,UNM)
             implicit none
             real*8,intent(out) :: KNM(3*Natoms),UNM(3*Natoms)
+            real*8             :: rot_vel(3,Natoms)
             real*8             :: vel_nm(3*Natoms)
             real*8             :: disp(3,Natoms),disp_nm(3*Natoms)  
+            integer            :: i
             
             !Kinetic part
-            vel_nm = cart_to_normal(vel_vib)
+            do i=1,Natoms !Bring instant velocities to original equilbrium frame using Eckart rotation matrix
+                  rot_vel(:,i) = matmul(U_eckart,vel_vib(:,i))
+            end do
+            vel_nm = cart_to_normal(rot_vel)
 
             KNM = 0.5d0*vel_nm**2
 
             !Potential part
-
             disp = xyz_cm - xyz_eckart
+            do i=1,Natoms !Same deal but for the displacements
+                  disp(:,i) = matmul(U_eckart,disp(:,i))
+            end do
             disp_nm = cart_to_normal(disp)
 
             UNM = 0.5d0*normal_eigenvalues*(disp_nm)**2
-end subroutine comp_normal_energy
+      end subroutine comp_normal_energy
+
+      function micro_division(E,nm_mode) result(q)
+            implicit none
+            real*8  :: E
+            integer :: nm_mode
+            real*8  :: q
+            real*8  :: K,A,x
+
+            K = normal_eigenvalues(nm_mode)
+            A = sqrt(2.d0*E/K)
+
+            x = rand()
+            q = A*cos(pi*x)
+      end function micro_division
+
+      subroutine excite_normal_mode(E,nm_mode,prop_pot,prop_kin)
+            implicit none
+            real*8,intent(in)  :: E,prop_pot,prop_kin
+            integer,intent(in) :: nm_mode
+            real*8             :: q,vq,K,x
+            real*8             :: q_vec(3*Natoms),vq_vec(3*Natoms)
+
+            q_vec = 0.d0
+            vq_vec = 0.d0
+
+            K = normal_eigenvalues(nm_mode)
+            if(prop_pot<1d-8 .and. prop_kin<1d-8) then 
+                  q = micro_division(E,nm_mode)
+
+                  x = rand()
+                  x = x/abs(x)
+                  vq = x*sqrt(2.d0*(E - 0.5d0*K*q**2))
+            else if(abs(prop_pot + prop_kin - 1.d0) > 1.d-8) then
+                  print*,"Incorrect proportions in normal mode excitation, aborting..."
+                  stop
+            else
+                  x = rand()
+                  x = x/abs(x)
+                  q = x*sqrt(2.d0*E*prop_pot/K)
+
+                  x = rand()
+                  x = x/abs(x)
+                  vq = x*sqrt(2.d0*E*prop_kin)
+            end if
+
+            q_vec(nm_mode) = q
+            vq_vec(nm_mode) = vq
+
+
+            xyz_mol = xyz_mol + normal_to_cart(q_vec)
+            vel_mol = vel_mol + normal_to_cart(vq_vec)
+
+      end subroutine excite_normal_mode
 
 end module vibration
