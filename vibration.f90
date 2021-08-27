@@ -425,4 +425,57 @@ module vibration
 
       end subroutine excite_normal_mode
 
+
+      subroutine excite_normal_modes_micro(E,N_special,kin_list)
+            implicit none
+            real*8,intent(in)  :: E
+            integer,intent(in) :: N_special,kin_list(N_special)
+            real*8             :: E_array(3*Natoms-6)
+            real*8             :: q(3*Natoms),vq(3*Natoms)
+            real*8             :: x1,x2,A,K
+            integer            :: N,i
+
+            !Distribute E energy among 3*N-6 harmonic oscillators
+            E_array = 0.d0
+            i = 1
+            N = 3*Natoms - 6
+            do while(i<3*Natoms-6 + 1)
+                  x1 = rand()
+                  x2 = rand()
+
+                  if(x2 < (1.d0-x1)**(N-i-1)) then
+                        E_array(i) = (E-sum(E_array))*x1
+                        i = i + 1
+                  end if
+            end do
+            E_array(3*Natoms-6) = E - sum(E_array(:3*Natoms-7))
+
+
+            i = 1
+            q = 0.d0
+            vq = 0.d0
+            do while(i<3*Natoms-6 + 1)
+                  K = normal_eigenvalues(i)
+                  A = sqrt(2.d0*E_array(i)/K)
+
+                  if(any(kin_list==i)) then
+                        x1 = rand()
+                        x1 = x1/abs(x1)
+
+                        vq(i) = x1*sqrt(2.d0*E_array(i))
+                        q(i) = 0.d0
+                  else
+                        x1 = rand()
+                        x1 = x1/abs(x1)
+
+                        q(i) = micro_division(E_array(i),i)
+                        vq(i) = x1*sqrt(2.d0*(E_array(i) - 0.5d0*K*q(i)**2))
+                  end if
+
+                  i = i + 1
+            end do
+
+            xyz_mol = xyz_mol + normal_to_cart(q)
+            vel_mol = vel_mol + normal_to_cart(vq)
+      end subroutine excite_normal_modes_micro
 end module vibration
