@@ -263,7 +263,6 @@ module vibration
       function comp_kinetic_energy(vel) result(K)
             implicit none
             real*8 :: vel(:,:),K
-            integer :: i
             K = sum(0.5d0*M_mol*sum(vel**2,1))
       end function comp_kinetic_energy
 
