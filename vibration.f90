@@ -267,22 +267,23 @@ module vibration
             K = sum(0.5d0*M_mol*sum(vel**2,1))
       end function comp_kinetic_energy
 
-      function comp_cm_vel(vel) result(vel_cm)
+      subroutine update_cm_vel()
             implicit none
-            real*8 :: vel(3,Natoms),vel_cm(3)
             integer :: i
-            vel_cm = 0.d0
+            cm_vel = 0.d0
             do i=1,Natoms
-                  vel_cm = vel_cm + M_mol(i)*vel(:,i)
+                  cm_vel = cm_vel + M_mol(i)*vel_mol(:,i)
             end do
-            vel_cm = vel_cm/sum(M_mol)
-      end function comp_cm_vel
+            cm_vel = cm_vel/sum(M_mol)
+            do i=1,Natoms
+                  vel_cm(:,i) = vel_mol(:,i) - cm_vel
+            end do
+      end subroutine update_cm_vel
 
-      function comp_cm_energy(vel) result(Ecm)
+      function comp_cm_energy() result(Ecm)
             implicit none
-            real*8 :: vel(3,Natoms)
             real*8 :: Ecm
-            cm_vel = comp_cm_vel(vel)
+            call update_cm_vel()
             Ecm = 0.5d0*sum(M_mol)*sum(cm_vel**2)
       end function comp_cm_energy
 
@@ -329,7 +330,7 @@ module vibration
             real*8,intent(out) :: Ecm,Erot,Evib,Ecor
             integer            :: i
 
-            Ecm  = comp_cm_energy(vel_mol)
+            Ecm  = comp_cm_energy()
 
             omega_mol = comp_angular_vel(vel_mol)
             Erot = comp_rotational_energy(omega_mol)
@@ -337,7 +338,7 @@ module vibration
             Evib = 0.d0
             Ecor = 0.d0
             do i=1,Natoms
-                  vel_vib(:,i) = vel_mol(:,i) - comp_cm_vel(vel_mol) &
+                  vel_vib(:,i) = vel_mol(:,i) - cm_vel &
                   - cross_product(omega_mol,xyz_cm(:,i))
                   Evib = Evib + M_mol(i)*sum(vel_vib(:,i)**2)
 
