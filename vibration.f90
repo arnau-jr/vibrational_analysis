@@ -386,10 +386,11 @@ module vibration
             q = A*cos(pi*x)
       end function micro_division
 
-      subroutine excite_normal_mode(E,nm_mode,prop_pot,prop_kin)
+      subroutine excite_normal_mode(E,nm_mode,prop_pot,prop_kin,sign)
             implicit none
             real*8,intent(in)  :: E,prop_pot,prop_kin
             integer,intent(in) :: nm_mode
+            integer,optional   :: sign
             real*8             :: q,vq,K,x
             real*8             :: q_vec(3*Natoms),vq_vec(3*Natoms)
 
@@ -407,13 +408,18 @@ module vibration
                   print*,"Incorrect proportions in normal mode excitation, aborting..."
                   stop
             else
-                  x = rand()-0.5d0
-                  x = x/(abs(x)+1d-8)
-                  q = x*sqrt(2.d0*E*prop_pot/K)
+                  if(present(sign)) then
+                        q =  sign*sqrt(2.d0*E*prop_pot/K)
+                        vq = sign*sqrt(2.d0*E*prop_kin)
+                  else
+                        x = rand()-0.5d0
+                        x = x/(abs(x)+1d-8)
+                        q = x*sqrt(2.d0*E*prop_pot/K)
 
-                  x = rand()-0.5d0
-                  x = x/(abs(x)+1d-8)
-                  vq = x*sqrt(2.d0*E*prop_kin)
+                        x = rand()-0.5d0
+                        x = x/(abs(x)+1d-8)
+                        vq = x*sqrt(2.d0*E*prop_kin)
+                  end if
             end if
 
             q_vec(nm_mode) = q
