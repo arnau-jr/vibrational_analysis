@@ -1,3 +1,7 @@
+! force_field module 
+! September 2021
+! Author: Arnau Jurado Romero
+
 module force_field
       implicit none 
 

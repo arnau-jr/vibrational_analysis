@@ -1,3 +1,7 @@
+! vibration module 
+! September 2021
+! Author: Arnau Jurado Romero
+
 module vibration
       use molecule
       use force_field

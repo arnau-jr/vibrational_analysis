@@ -1,3 +1,7 @@
+! molecule module 
+! September 2021
+! Author: Arnau Jurado Romero
+
 module molecule
       implicit none 
 
