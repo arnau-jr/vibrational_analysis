@@ -85,7 +85,7 @@ module vibration
             xyz_nm = matmul(transpose(normal_base),xyz_mw_unpacked)
       end function cart_to_normal
 
-            function normal_to_cart(xyz_nm) result(xyz)
+      function normal_to_cart(xyz_nm) result(xyz)
             implicit none
             real*8              :: xyz_nm(3*Natoms),xyz(3,Natoms)
             real*8              :: xyz_mw(3,Natoms),xyz_mw_unpacked(3*Natoms)
@@ -386,13 +386,13 @@ module vibration
             q = A*cos(pi*x)
       end function micro_division
 
-      subroutine excite_normal_mode(E,nm_mode,prop_pot,prop_kin,sign)
+      subroutine excite_normal_mode(E,nm_mode,prop_pot,prop_kin,manual_sign)
             implicit none
             real*8,intent(in)  :: E,prop_pot,prop_kin
             integer,intent(in) :: nm_mode
-            integer,optional   :: sign
-            real*8             :: q,vq,K,x
-            real*8             :: q_vec(3*Natoms),vq_vec(3*Natoms)
+            integer,optional   :: manual_sign
+            real*8             :: q,vq,K,x,E0,vq0
+            real*8             :: q_vec(3*Natoms),vq_vec(3*Natoms),vq0_vec(3*Natoms)
 
             q_vec = 0.d0
             vq_vec = 0.d0
@@ -407,10 +407,17 @@ module vibration
             else if(abs(prop_pot + prop_kin - 1.d0) > 1.d-8) then
                   print*,"Incorrect proportions in normal mode excitation, aborting..."
                   stop
+            else if(abs(prop_kin)-1.d0 < 1.d-8) then
+                  vq0_vec = cart_to_normal(vel_vib)
+                  vq0 = vq0_vec(nm_mode)
+                  E0 = 0.5d0*vq0**2
+
+                  q  = 0.d0
+                  vq = -vq0 + sign(sqrt(2.d0*(E0+E)),vq0)
             else
-                  if(present(sign)) then
-                        q =  sign*sqrt(2.d0*E*prop_pot/K)
-                        vq = sign*sqrt(2.d0*E*prop_kin)
+                  if(present(manual_sign)) then
+                        q =  manual_sign*sqrt(2.d0*E*prop_pot/K)
+                        vq = manual_sign*sqrt(2.d0*E*prop_kin)
                   else
                         x = rand()-0.5d0
                         x = x/(abs(x)+1d-8)
