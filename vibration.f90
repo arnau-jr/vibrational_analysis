@@ -13,9 +13,19 @@ module vibration
 
       subroutine comp_normal_modes()
             implicit none
-            real*8  :: H(3*Natoms,3*Natoms),Hm(3*Natoms,3*Natoms),d(3*Natoms)
-            real*8  :: work(500)
-            integer :: a,b,p,q,i,j
+            real*8              :: H(3*Natoms,3*Natoms),Hm(3*Natoms,3*Natoms),d(3*Natoms)
+            real*8,allocatable  :: work(:)
+            integer             :: a,b,p,q,i,j,Nwork
+
+            allocate(work(1))
+            call dsyev("V","U",3*Natoms,Hm,3*Natoms,d,work,-1,i)
+            if(i/=0) then
+                  print*,"Something went wrong when determining Nwork, aborting..."
+                  stop
+            end if
+            Nwork = int(work(1))
+            deallocate(work)
+            allocate(work(NWork))
 
             !Build mass weighted matrix of force constants
             H = build_hessian(Natoms,xyz_eq)
@@ -34,7 +44,7 @@ module vibration
 
             allocate(normal_base(3*Natoms,3*Natoms),normal_eigenvalues(3*Natoms),normal_frequencies(3*Natoms))
             !Diagonalize using LAPACK
-            call dsyev("V","U",3*Natoms,Hm,3*Natoms,d,work,500,i)
+            call dsyev("V","U",3*Natoms,Hm,3*Natoms,d,work,Nwork,i)
 
             ! normal_eigenvalues = d
 
