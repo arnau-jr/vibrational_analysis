@@ -307,7 +307,6 @@ module vibration
             integer :: i
             l = 0.d0
             do i=1,Natoms
-                  ! l = l + cross_product(xyz_eckart(:,i),vel(:,i))
                   l = l + M_mol(i)*cross_product(xyz_eckart(:,i),vel(:,i))
             end do
       end function comp_pseudo_angular_moment
@@ -355,7 +354,7 @@ module vibration
                   - cross_product(omega_mol,xyz_cm(:,i))
                   Evib = Evib + M_mol(i)*sum(vel_vib(:,i)**2)
 
-                  Ecor = Ecor + M_mol(i)*sum(vel_mol(:,i)*cross_product(omega_mol,xyz_cm(:,i)))
+                  Ecor = Ecor + M_mol(i)*sum(vel_vib(:,i)*cross_product(omega_mol,xyz_cm(:,i)))
             end do
             Evib = 0.5d0*Evib
       end subroutine kinetic_energy_analysis
