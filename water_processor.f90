@@ -7,6 +7,8 @@ module water_processor
 
       !Constants and parameters
       real*8,parameter :: water_atomic_mass(10) = (/1.00782522,0.,0.,0.,0.,12.01,14.01,15.99491502,0.,0./)!TBD
+      real*8,parameter :: solvent_kcal_to_kj = 4.184d0
+      real*8,parameter :: electrostatic_constant = 1382.3616 !kJ/mol Angs
 
       !Atom information
       integer               :: Nmols,Natoms_per_mol,water_Natoms
@@ -28,6 +30,13 @@ module water_processor
       real*8,allocatable :: water_vel_cm(:,:,:) !Instantaneous velocities in CoM frame
       real*8,allocatable :: water_cm_vel(:,:),omega_mol(:,:)
       real*8,allocatable :: water_vel_vib(:,:,:) !Vibrational velocities
+
+      !Forces acting on the solvent
+      integer            :: Natoms_central
+      real*8,allocatable :: pair_coefs(:,:,:) !(coef,solvent types,central types)
+      real*8             :: pair_cut
+      real*8,allocatable :: q_solvent(:),q_central(:)
+      real*8,allocatable :: solvent_F(:,:,:)
 
       contains
 
@@ -84,9 +93,9 @@ module water_processor
             water_Natoms = Natoms_per_mol*Nmols
             !Allocate quantities
             allocate(water_S_mol(water_Natoms),water_M_mol(water_Natoms),water_Z_mol(water_Natoms))
-            allocate(water_xyz_mol(3,3,water_Natoms),water_xyz_cm(3,3,water_Natoms))
-            allocate(water_xyz_eq(3,3),water_xyz_eckart(3,3,water_Natoms))
-            allocate(water_vel_mol(3,3,water_Natoms),water_vel_cm(3,3,water_Natoms),water_vel_vib(3,3,water_Natoms))
+            allocate(water_xyz_mol(3,3,Nmols),water_xyz_cm(3,3,Nmols),water_xyz_eq(3,3),water_xyz_eckart(3,3,Nmols))
+            allocate(water_vel_mol(3,3,Nmols),water_vel_cm(3,3,Nmols),water_vel_vib(3,3,Nmols))
+            allocate(solvent_F(3,Natoms_per_mol,Nmols))
 
             water_xyz_mol = xyz
             water_vel_mol = vel
@@ -316,7 +325,98 @@ module water_processor
             call check_eckart_conditions()
       end subroutine water_get_eckart_frame
 
-      
+
+      subroutine init_forcefield(unit)
+            implicit none
+            integer,intent(in) :: unit
+            character          :: dummy*90,units*90,pot_type*1
+            real*8             :: aux1,aux2
+            integer            :: i,a,b,c,d,dummy2
+
+            read(unit,*)dummy,Natoms_central
+            read(unit,*)dummy,i
+            read(unit,*)dummy
+
+            if(Natoms_per_mol /= i) then
+                  print*,"Atom types do not match atoms per molecule, not initialized correctly, aborting..."
+                  stop
+            end if
+
+            !Initialize
+
+            !Read stretching info
+            read(unit,*)pot_type
+            read(unit,*)units
+            read(unit,*)pair_cut
+
+            if(pot_type=="LJ") then
+                  allocate(pair_coefs(2,Natoms_per_mol,Natoms_central))
+            elseif(pot_type=="BU") then
+                  print*,"Buckhingham not implmented yet"
+            else
+                  print*,"Pair potential not supported, aborting..."
+                  stop
+            end if
+
+            !Read streching coefs
+            do i=1,Natoms_central*Natoms_per_mol
+                  if(pot_type=="LJ") then
+                        read(unit,*)a,b,dummy,aux1,aux2
+                        pair_coefs(:,a,b) = (/aux1,aux2/)
+                        !Correct units if necessary
+                        if(units=="KC") then
+                              pair_coefs(:,a,b) = pair_coefs(:,a,b)*solvent_kcal_to_kj
+                        end if
+                  end if
+            end do
+            read(unit,*,end=10) !Check if end file, blank line should be there if continuing
+
+            read(unit,*)dummy
+            read(unit,*)dummy
+            allocate(q_solvent(Natoms_per_mol))
+            do i=1,Natoms_per_mol
+                  read(unit,*)dummy2, q_solvent(i)
+            end do
+
+            read(unit,*,end=10)
+
+            read(unit,*)dummy
+            allocate(q_central(Natoms_central))
+            do i=1,Natoms_central
+                  read(unit,*)dummy2, q_central(i)
+            end do
+
+            10 continue
+      end subroutine init_forcefield
+
+      subroutine comp_forces_on_solvent(xyz_central)
+            implicit none
+            real*8,intent(in)  :: xyz_central(3,Natoms_central)
+            real*8             :: distv(3),dist
+            real*8             :: epsilon,sigma
+            integer            :: i,j,mol
+            
+            solvent_F = 0.d0
+            do mol=1,Nmols
+                  do i=1,Natoms_per_mol
+                        do j=1,Natoms_central
+                              distv = water_xyz_mol(:,i,mol)-xyz_central(:,j)
+                              dist = sqrt(sum(distv**2))
+                              !Coulomb part
+                              solvent_F(:,i,mol) = solvent_F(:,i,mol) &
+                              - distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**2
+
+                              !Pair part
+                              if(dist<pair_cut .and. pair_coefs(1,i,j)>1d-8) then
+                                    epsilon = pair_coefs(1,i,j)
+                                    sigma = pair_coefs(2,i,j)
+                                    solvent_F(:,i,mol) = solvent_F(:,i,mol) &
+                                    + epsilon*((48.d0*sigma**14)/dist**14 - (24.d0*sigma**8)/dist**8)*distv
+                              end if
+                        end do
+                  end do
+            end do
+      end subroutine comp_forces_on_solvent
 
 
       ! subroutine write_conf(r,port)
