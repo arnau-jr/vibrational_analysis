@@ -84,7 +84,7 @@ module molecule
             read(unit,*)
             !Allocate quantities
             allocate(S_mol(Natoms),M_mol(Natoms),Z_mol(Natoms))
-            allocate(xyz_mol(3,Natoms),xyz_cm(3,Natoms),xyz_eckart(3,Natoms))
+            allocate(xyz_mol(3,Natoms),xyz_cm(3,Natoms),xyz_eq(3,Natoms),xyz_eckart(3,Natoms))
             allocate(vel_mol(3,Natoms),vel_cm(3,Natoms),vel_vib(3,Natoms))
             vel_mol = 0.d0
             vel_cm = 0.d0
