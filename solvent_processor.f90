@@ -12,7 +12,7 @@ module solvent_processor
 
       !Atom information
       integer               :: Nmols,Natoms_per_mol,water_Natoms
-      character,allocatable :: water_S_mol(:)*2 !Atomic symbols of atoms
+      character,allocatable :: solvent_S_mol(:)*2 !Atomic symbols of atoms
       integer,allocatable   :: water_Z_mol(:) !Atomic numbers of atoms
       real*8,allocatable    :: water_M_mol(:) !Atomic masses of atoms
       
@@ -28,7 +28,7 @@ module solvent_processor
       !Velocities (same as coordinates)
       real*8,allocatable :: water_vel_mol(:,:,:) !Instantaneous velocities
       real*8,allocatable :: water_vel_cm(:,:,:) !Instantaneous velocities in CoM frame
-      real*8,allocatable :: water_cm_vel(:,:),omega_mol(:,:)
+      real*8,allocatable :: water_cm_vel(:,:),solvent_omega_mol(:,:)
       real*8,allocatable :: water_vel_vib(:,:,:) !Vibrational velocities
 
       !Forces acting on the solvent
@@ -36,28 +36,28 @@ module solvent_processor
       real*8,allocatable :: pair_coefs(:,:,:) !(coef,solvent types,central types)
       real*8             :: pair_cut
       real*8,allocatable :: q_solvent(:),q_central(:)
-      real*8,allocatable :: solvent_F(:,:,:)
+      real*8,allocatable :: solvent_F(:,:,:),solvent_PT(:),solvent_PR(:)
 
       contains
 
-      subroutine water_parse_atomic_symbol()
+      subroutine solvent_parse_atomic_symbol()
             implicit none
             integer :: i
             do i=1,water_Natoms
-                  if(water_S_mol(i)=="H") then
+                  if(solvent_S_mol(i)=="H") then
                         water_Z_mol(i) = 1
-                  elseif(water_S_mol(i)=="C") then
+                  elseif(solvent_S_mol(i)=="C") then
                         water_Z_mol(i) = 6
-                  elseif(water_S_mol(i)=="N") then
+                  elseif(solvent_S_mol(i)=="N") then
                         water_Z_mol(i) = 7
-                  elseif(water_S_mol(i)=="O") then
+                  elseif(solvent_S_mol(i)=="O") then
                         water_Z_mol(i) = 8
                   else
                         write(*,*)"Parsing: atom not recognized"
                   endif
                   water_M_mol(i) = water_atomic_mass(water_Z_mol(i))
             enddo
-      end subroutine water_parse_atomic_symbol
+      end subroutine solvent_parse_atomic_symbol
 
       subroutine water_update_cm_coords()
             implicit none
@@ -70,57 +70,82 @@ module solvent_processor
 
             do mol=1,Nmols
                   total_mass = 0.d0
-                  do i=1,3
-                        total_mass = total_mass + water_M_mol(3*(mol-1)+i)
-                        water_cm_pos(:,mol) = water_cm_pos(:,mol) + water_M_mol(3*(mol-1)+1)*water_xyz_mol(:,i,mol)
+                  do i=1,Natoms_per_mol
+                        total_mass = total_mass + water_M_mol(Natoms_per_mol*(mol-1)+i)
+                        water_cm_pos(:,mol) = water_cm_pos(:,mol) + water_M_mol(Natoms_per_mol*(mol-1)+i)*water_xyz_mol(:,i,mol)
                   end do
                   water_cm_pos(:,mol) = water_cm_pos(:,mol)/total_mass
-                  do i=1,3
+                  do i=1,Natoms_per_mol
                         water_xyz_cm(:,i,mol) = water_xyz_mol(:,i,mol) - water_cm_pos(:,mol)
                   end do
             end do
       end subroutine water_update_cm_coords
 
-
-      subroutine init_waters(Nmolecules,xyz,vel,unit)
+      subroutine solvent_update_cm_vel()
             implicit none
-            integer,intent(in) :: Nmolecules,xyz(3,3,Nmolecules),vel(3,3,Nmolecules)
-            integer,intent(in) :: unit
+            real*8  :: total_mass
+            integer :: mol,i
+            water_cm_vel = 0.d0
+            do mol=1,Nmols
+                  total_mass=0.d0
+                  do i=1,Natoms_per_mol
+                        total_mass = total_mass + water_M_mol(Natoms_per_mol*(mol-1)+i)
+                        water_cm_vel(:,mol) = water_cm_vel(:,mol) + water_M_mol(Natoms_per_mol*(mol-1)+i)*water_vel_mol(:,i,mol)
+                  end do
+                  water_cm_vel(:,mol) = water_cm_vel(:,mol)/total_mass
+                  do i=1,Natoms_per_mol
+                        water_vel_cm(:,i,mol) = water_vel_mol(:,i,mol) - water_cm_vel(:,mol)
+                  end do
+            end do
+      end subroutine solvent_update_cm_vel
+
+
+      subroutine init_solvent(Nmolecules,Ncentral,unitini,uniteq)
+            implicit none
+            integer,intent(in) :: Nmolecules,Ncentral
+            integer,intent(in) :: unitini,uniteq
             integer            :: mol,i
+            character          :: dummy*90
 
             Nmols = Nmolecules
+            Natoms_central = Ncentral
             Natoms_per_mol = 3
             water_Natoms = Natoms_per_mol*Nmols
             !Allocate quantities
-            allocate(water_S_mol(water_Natoms),water_M_mol(water_Natoms),water_Z_mol(water_Natoms))
+            allocate(solvent_S_mol(water_Natoms),water_M_mol(water_Natoms),water_Z_mol(water_Natoms))
             allocate(water_xyz_mol(3,3,Nmols),water_xyz_cm(3,3,Nmols),water_xyz_eq(3,3),water_xyz_eckart(3,3,Nmols))
+            allocate(water_cm_pos(3,Nmols))
             allocate(water_vel_mol(3,3,Nmols),water_vel_cm(3,3,Nmols),water_vel_vib(3,3,Nmols))
-            allocate(solvent_F(3,Natoms_per_mol,Nmols))
+            allocate(water_cm_vel(3,Nmols))
+            allocate(water_U_eckart(3,3,Nmols),solvent_omega_mol(3,Nmols))
+            allocate(solvent_F(3,Natoms_per_mol,Nmols),solvent_PT(Nmols),solvent_PR(Nmols))
 
-            water_xyz_mol = xyz
-            water_vel_mol = vel
-
+            !Read initial configuration
+            do i=1,9
+                  read(unitini,*)
+            end do
+            do mol=1,Nmols
+                  do i=1,Natoms_per_mol
+                        read(unitini,*)solvent_S_mol(3*(mol-1)+i),water_xyz_mol(:,i,mol),water_vel_mol(:,i,mol)
+                  end do
+            end do
+            
             water_vel_cm = 0.d0
             water_vel_vib = 0.d0
 
-            !Read the atoms themselves
-            do mol = 1,Nmols
-                  water_S_mol(3*(mol-1)+1) = "O"
-                  water_S_mol(3*(mol-1)+2) = "H"
-                  water_S_mol(3*(mol-1)+3) = "H"
-            enddo
-
             !Get masses from symbols
-            call water_parse_atomic_symbol()
-
+            call solvent_parse_atomic_symbol()
             !Obtain equilibrium CoM coordinates
             call water_update_cm_coords()
-
-            do i=1,3
-                  read(unit,*)water_xyz_eq(:,i)
+            call solvent_update_cm_vel()
+           
+            read(uniteq,*)
+            read(uniteq,*)
+            do i=1,Natoms_per_mol
+                  read(uniteq,*)dummy,water_xyz_eq(:,i)
             end do
             water_eq_cm_pos = 0.d0
-      end subroutine init_waters
+      end subroutine init_solvent
 
       function water_build_pseudo_inertia_moment(mol) result(I)
             implicit none
@@ -130,16 +155,18 @@ module solvent_processor
             integer :: j,a,b
 
             delta_term = 0.d0
-            do j=1,3
-                  delta_term = delta_term + water_M_mol(3*(mol-1)+j)*sum(water_xyz_eckart(:,j,mol)*water_xyz_cm(:,j,mol))
+            do j=1,Natoms_per_mol
+                  delta_term = delta_term + water_M_mol(Natoms_per_mol*(mol-1)+j)*&
+                  sum(water_xyz_eckart(:,j,mol)*water_xyz_cm(:,j,mol))
             end do
 
             I = 0.d0
-            do a=1,3
-                  do b=1,3
+            do a=1,Natoms_per_mol
+                  do b=1,Natoms_per_mol
                         if(a==b) I(a,b) = I(a,b) + delta_term
-                        do j=1,3
-                              I(a,b) = I(a,b) - water_M_mol(3*(mol-1)+j)*water_xyz_cm(a,j,mol)*water_xyz_eckart(b,j,mol)
+                        do j=1,Natoms_per_mol
+                              I(a,b) = I(a,b) - water_M_mol(Natoms_per_mol*(mol-1)+j)*&
+                              water_xyz_cm(a,j,mol)*water_xyz_eckart(b,j,mol)
                         end do
                   end do
             end do
@@ -181,8 +208,9 @@ module solvent_processor
             real*8  :: l(3)
             integer :: i
             l = 0.d0
-            do i=1,3
-                  l = l + water_M_mol(3*(mol-1)+i)*water_cross_product(water_xyz_eckart(:,i,mol),water_vel_mol(:,i,mol))
+            do i=1,Natoms_per_mol
+                  l = l + water_M_mol(Natoms_per_mol*(mol-1)+i)*&
+                  water_cross_product(water_xyz_eckart(:,i,mol),water_vel_mol(:,i,mol))
             end do
       end function water_comp_pseudo_angular_moment
 
@@ -193,10 +221,10 @@ module solvent_processor
             do mol=1,Nmols
                   Iab = water_build_pseudo_inertia_moment(mol)
                   Iab_inv = water_invert_matrix(Iab)
-
+            
                   l = water_comp_pseudo_angular_moment(mol)
-
-                  omega_mol(:,mol) = matmul(Iab_inv,l)
+                  
+                  solvent_omega_mol(:,mol) = matmul(Iab_inv,l)
             end do
       end subroutine water_comp_angular_vel
 
@@ -329,20 +357,22 @@ module solvent_processor
       subroutine init_solvent_forcefield(unit)
             implicit none
             integer,intent(in) :: unit
-            character          :: dummy*90,units*90,pot_type*1
+            character          :: dummy*90,units*90,pot_type*90
             real*8             :: aux1,aux2
-            integer            :: i,a,b,c,d,dummy2
+            integer            :: i,a,b,dummy2
 
-            read(unit,*)dummy,Natoms_central
-            read(unit,*)dummy,i
-            read(unit,*)dummy
+            read(unit,*)dummy,a
+            read(unit,*)dummy,b
 
-            if(Natoms_per_mol /= i) then
-                  print*,"Atom types do not match atoms per molecule, not initialized correctly, aborting..."
+            if(Natoms_central /= a) then
+                  print*,"Number of central molecule atoms do not match, not initialized correctly, aborting..."
                   stop
             end if
 
-            !Initialize
+            if(Natoms_per_mol /= b) then
+                  print*,"Atom types do not match atoms per molecule, not initialized correctly, aborting..."
+                  stop
+            end if
 
             !Read stretching info
             read(unit,*)pot_type
@@ -361,11 +391,11 @@ module solvent_processor
             !Read streching coefs
             do i=1,Natoms_central*Natoms_per_mol
                   if(pot_type=="LJ") then
-                        read(unit,*)a,b,dummy,aux1,aux2
+                        read(unit,*)a,b,aux1,aux2
                         pair_coefs(:,a,b) = (/aux1,aux2/)
                         !Correct units if necessary
                         if(units=="KC") then
-                              pair_coefs(:,a,b) = pair_coefs(:,a,b)*solvent_kcal_to_kj
+                              pair_coefs(1,a,b) = pair_coefs(1,a,b)*solvent_kcal_to_kj
                         end if
                   end if
             end do
@@ -402,6 +432,7 @@ module solvent_processor
                         do j=1,Natoms_central
                               distv = water_xyz_mol(:,i,mol)-xyz_central(:,j)
                               dist = sqrt(sum(distv**2))
+
                               !Coulomb part
                               solvent_F(:,i,mol) = solvent_F(:,i,mol) &
                               - distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**2
@@ -411,26 +442,69 @@ module solvent_processor
                                     epsilon = pair_coefs(1,i,j)
                                     sigma = pair_coefs(2,i,j)
                                     solvent_F(:,i,mol) = solvent_F(:,i,mol) &
-                                    + epsilon*((48.d0*sigma**14)/dist**14 - (24.d0*sigma**8)/dist**8)*distv
+                                    + epsilon*((48.d0*sigma**12)/dist**14 - (24.d0*sigma**6)/dist**8)*distv
                               end if
                         end do
                   end do
             end do
       end subroutine comp_forces_on_solvent
 
+      subroutine comp_power_on_solvent()
+            implicit none
+            integer :: mol,i,j
+            real*8  :: total_F(3),tau(3)
 
-      ! subroutine write_conf(r,port)
-      !       implicit none
-      !       integer,intent(in) :: port
-      !       real*8,intent(in)  :: r(3,Natoms)
-      !       integer            :: i
+            call solvent_update_cm_vel()
+            call water_get_eckart_frame()
+            call water_comp_angular_vel()
 
-      !       write(port,"(I5)")Natoms
-      !       write(port,*)""
-      !       do i=1,Natoms
-      !             write(port,"(A,2X,E20.10,2X,E20.10,2X,E20.10)")S_mol(i),r(:,i)
-      !       enddo
-      ! end
+            solvent_PT = 0.d0
+            solvent_PR = 0.d0
+
+            do mol=1,Nmols
+                  total_F = sum(solvent_F(:,:,mol),2)
+
+                  solvent_PT(mol) = solvent_PT(mol) + sum(total_F*water_cm_vel(:,mol))
+                  ! solvent_PR = solvent_PR + water_cross_product(solvent_omega_mol(:,mol),
+            end do
+
+      end subroutine comp_power_on_solvent
+
+
+      subroutine solvent_write_conf(r,port)
+            implicit none
+            integer,intent(in) :: port
+            real*8,intent(in)  :: r(3,Natoms_per_mol,Nmols)
+            integer            :: i,mol
+
+            write(port,"(I5)")Natoms_per_mol*Nmols
+            write(port,*)""
+            do mol=1,Nmols
+                  do i=1,Natoms_per_mol
+                        write(port,"(A,2X,E20.10,2X,E20.10,2X,E20.10)")solvent_S_mol(Natoms_per_mol*(i-1)+i),r(:,i,mol)
+                  end do
+            enddo
+      end subroutine solvent_write_conf
+
+      subroutine solvent_write_conf_with_central(r,rcentral,S_central,port)
+            implicit none
+            integer,intent(in)   :: port
+            real*8,intent(in)    :: r(3,Natoms_per_mol,Nmols),rcentral(3,Natoms_central)
+            character,intent(in) :: S_central(Natoms_central)*2
+            integer              :: i,mol
+
+            write(port,"(I5)")Natoms_per_mol*Nmols+Natoms_central
+            write(port,*)""
+            do mol=1,Nmols
+                  do i=1,Natoms_per_mol
+                        write(port,"(A,2X,E20.10,2X,E20.10,2X,E20.10)")solvent_S_mol(Natoms_per_mol*(mol-1)+i),r(:,i,mol)
+                  end do
+            enddo
+            do i=1,Natoms_central
+                  write(port,"(A,2X,E20.10,2X,E20.10,2X,E20.10)")S_central(i),rcentral(:,i)
+            end do
+      end subroutine solvent_write_conf_with_central
+
 
 
 end module solvent_processor
