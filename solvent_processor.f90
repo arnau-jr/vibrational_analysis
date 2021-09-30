@@ -1,8 +1,8 @@
-! water_processor module 
+! solvent_processor module 
 ! October 2021
 ! Author: Arnau Jurado Romero
 
-module water_processor
+module solvent_processor
       implicit none 
 
       !Constants and parameters
@@ -326,7 +326,7 @@ module water_processor
       end subroutine water_get_eckart_frame
 
 
-      subroutine init_forcefield(unit)
+      subroutine init_solvent_forcefield(unit)
             implicit none
             integer,intent(in) :: unit
             character          :: dummy*90,units*90,pot_type*1
@@ -387,7 +387,7 @@ module water_processor
             end do
 
             10 continue
-      end subroutine init_forcefield
+      end subroutine init_solvent_forcefield
 
       subroutine comp_forces_on_solvent(xyz_central)
             implicit none
@@ -433,5 +433,5 @@ module water_processor
       ! end
 
 
-end module water_processor
+end module solvent_processor
 
