@@ -8,7 +8,7 @@ module solvent_processor
       !Constants and parameters
       real*8,parameter :: water_atomic_mass(10) = (/1.00782522,0.,0.,0.,0.,12.01,14.01,15.99491502,0.,0./)!TBD
       real*8,parameter :: solvent_kcal_to_kj = 4.184d0
-      real*8,parameter :: electrostatic_constant = 1382.3616 !kJ/mol Angs
+      real*8,parameter :: electrostatic_constant = 1389.374205 !kJ/mol Angs
 
       !Atom information
       integer               :: Nmols,Natoms_per_mol,water_Natoms
@@ -435,7 +435,8 @@ module solvent_processor
 
                               !Coulomb part
                               solvent_F(:,i,mol) = solvent_F(:,i,mol) &
-                              - distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**2
+                              + distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**3
+
 
                               !Pair part
                               if(dist<pair_cut .and. pair_coefs(1,i,j)>1d-8) then
@@ -443,16 +444,17 @@ module solvent_processor
                                     sigma = pair_coefs(2,i,j)
                                     solvent_F(:,i,mol) = solvent_F(:,i,mol) &
                                     + epsilon*((48.d0*sigma**12)/dist**14 - (24.d0*sigma**6)/dist**8)*distv
-                              end if
+                              end if    
                         end do
                   end do
             end do
       end subroutine comp_forces_on_solvent
 
-      subroutine comp_power_on_solvent()
+      subroutine comp_power_on_solvent(cm_central)
             implicit none
+            real*8,intent(in) :: cm_central(3)
             integer :: mol,i,j
-            real*8  :: total_F(3),tau(3)
+            real*8  :: total_F(3),tau(3),cm_dist(3)
 
             call solvent_update_cm_vel()
             call water_get_eckart_frame()
@@ -463,9 +465,11 @@ module solvent_processor
 
             do mol=1,Nmols
                   total_F = sum(solvent_F(:,:,mol),2)
+                  cm_dist = water_cm_pos(:,mol) - cm_central
+                  tau = water_cross_product(cm_dist,total_F)
 
                   solvent_PT(mol) = solvent_PT(mol) + sum(total_F*water_cm_vel(:,mol))
-                  ! solvent_PR = solvent_PR + water_cross_product(solvent_omega_mol(:,mol),
+                  solvent_PR(mol) = solvent_PR(mol) + sum(solvent_omega_mol(:,mol)*tau)
             end do
 
       end subroutine comp_power_on_solvent
