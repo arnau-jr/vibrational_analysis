@@ -33,6 +33,7 @@ module solvent_processor
 
       !Forces acting on the solvent
       integer            :: Natoms_central
+      character          :: pair_pot_type*90
       real*8,allocatable :: pair_coefs(:,:,:) !(coef,solvent types,central types)
       real*8             :: pair_cut
       real*8,allocatable :: q_solvent(:),q_central(:)
@@ -358,7 +359,7 @@ module solvent_processor
             implicit none
             integer,intent(in) :: unit
             character          :: dummy*90,units*90,pot_type*90
-            real*8             :: aux1,aux2
+            real*8             :: aux1,aux2,aux3
             integer            :: i,a,b,dummy2
 
             read(unit,*)dummy,a
@@ -374,7 +375,7 @@ module solvent_processor
                   stop
             end if
 
-            !Read stretching info
+            !Read pair info
             read(unit,*)pot_type
             read(unit,*)units
             read(unit,*)pair_cut
@@ -382,13 +383,14 @@ module solvent_processor
             if(pot_type=="LJ") then
                   allocate(pair_coefs(2,Natoms_per_mol,Natoms_central))
             elseif(pot_type=="BU") then
-                  print*,"Buckhingham not implmented yet"
+                  allocate(pair_coefs(3,Natoms_per_mol,Natoms_central))
             else
                   print*,"Pair potential not supported, aborting..."
                   stop
             end if
 
-            !Read streching coefs
+            pair_pot_type = pot_type
+            !Read pair coefs
             do i=1,Natoms_central*Natoms_per_mol
                   if(pot_type=="LJ") then
                         read(unit,*)a,b,aux1,aux2
@@ -396,6 +398,15 @@ module solvent_processor
                         !Correct units if necessary
                         if(units=="KC") then
                               pair_coefs(1,a,b) = pair_coefs(1,a,b)*solvent_kcal_to_kj
+                        end if
+                  end if
+                  if(pot_type=="LJ") then
+                        read(unit,*)a,b,aux1,aux2,aux3
+                        pair_coefs(:,a,b) = (/aux1,aux2,aux3/)
+                        !Correct units if necessary
+                        if(units=="KC") then
+                              pair_coefs(1,a,b) = pair_coefs(1,a,b)*solvent_kcal_to_kj
+                              pair_coefs(3,a,b) = pair_coefs(3,a,b)*solvent_kcal_to_kj
                         end if
                   end if
             end do
@@ -419,31 +430,75 @@ module solvent_processor
             10 continue
       end subroutine init_solvent_forcefield
 
-      subroutine comp_forces_on_solvent(xyz_central)
+      subroutine comp_forces_on_solvent(xyz_central,L_box,n_cells)
             implicit none
-            real*8,intent(in)  :: xyz_central(3,Natoms_central)
+            real*8,intent(in)  :: xyz_central(3,Natoms_central),L_box
+            integer,intent(in) :: n_cells
             real*8             :: distv(3),dist
+            real*8             :: aux_distv(3),aux_dist
             real*8             :: epsilon,sigma
-            integer            :: i,j,mol
+            real*8             :: Abu,bbu,Cbu
+            integer            :: i,j,k,l,mol
+            integer            :: a,b,c
             
             solvent_F = 0.d0
             do mol=1,Nmols
                   do i=1,Natoms_per_mol
                         do j=1,Natoms_central
                               distv = water_xyz_mol(:,i,mol)-xyz_central(:,j)
+                              distv = distv-L_box*nint(distv/L_box)
                               dist = sqrt(sum(distv**2))
 
                               !Coulomb part
-                              solvent_F(:,i,mol) = solvent_F(:,i,mol) &
-                              + distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**3
+                              ! solvent_F(:,i,mol) = solvent_F(:,i,mol) &
+                              ! + distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**3
+                              do a=-n_cells,n_cells
+                              do b=-n_cells,n_cells
+                              do c=-n_cells,n_cells
+                              ! do k=1,3
+                                    ! aux_distv = distv
+                                    aux_distv(1) = distv(1) + a*L_box
+                                    aux_distv(2) = distv(2) + b*L_box
+                                    aux_distv(3) = distv(3) + c*L_box
+                                    aux_dist = sqrt(sum(aux_distv**2))
+
+                                    solvent_F(:,i,mol) = solvent_F(:,i,mol) &
+                                    + aux_distv*electrostatic_constant*q_solvent(i)*q_central(j)/aux_dist**3
+                              end do
+                              end do
+                              end do
+
+                              ! do k=1,3
+                              !       aux_distv = distv
+                              !       aux_distv(k) = aux_distv(k) + l*L_box
+                              !       aux_dist = sqrt(sum(aux_distv**2))
+
+                              !       solvent_F(:,i,mol) = solvent_F(:,i,mol) &
+                              !       + aux_distv*electrostatic_constant*q_solvent(i)*q_central(j)/aux_dist**3
+
+                              !       aux_distv = distv
+                              !       aux_distv(k) = aux_distv(k) - l*L_box
+                              !       aux_dist = sqrt(sum(aux_distv**2))
+
+                              !       solvent_F(:,i,mol) = solvent_F(:,i,mol) &
+                              !       + aux_distv*electrostatic_constant*q_solvent(i)*q_central(j)/aux_dist**3
+                              ! end do
 
 
                               !Pair part
-                              if(dist<pair_cut .and. pair_coefs(1,i,j)>1d-8) then
-                                    epsilon = pair_coefs(1,i,j)
-                                    sigma = pair_coefs(2,i,j)
-                                    solvent_F(:,i,mol) = solvent_F(:,i,mol) &
-                                    + epsilon*((48.d0*sigma**12)/dist**14 - (24.d0*sigma**6)/dist**8)*distv
+                              if(dist<pair_cut) then
+                                    if(pair_pot_type=="LJ") then
+                                          epsilon = pair_coefs(1,i,j)
+                                          sigma = pair_coefs(2,i,j)
+                                          solvent_F(:,i,mol) = solvent_F(:,i,mol) &
+                                          + epsilon*((48.d0*sigma**12)/dist**14 - (24.d0*sigma**6)/dist**8)*distv
+                                    else if(pair_pot_type=="BU") then
+                                          Abu = pair_coefs(1,i,j)
+                                          bbu = pair_coefs(2,i,j)
+                                          Cbu = pair_coefs(3,i,j)
+                                          solvent_F(:,i,mol) = solvent_F(:,i,mol) &
+                                          + (6.d0*Cbu/dist**8 - Abu*bbu*exp(-bbu*dist)/dist)*distv
+                                    end if
                               end if    
                         end do
                   end do
@@ -469,6 +524,9 @@ module solvent_processor
                   tau = water_cross_product(cm_dist,total_F)
 
                   solvent_PT(mol) = solvent_PT(mol) + sum(total_F*water_cm_vel(:,mol))
+                  ! do i=1,Natoms_per_mol
+                  !       solvent_PT(mol) = solvent_PT(mol) + sum(solvent_F(:,i,mol)*water_vel_mol(:,i,mol))
+                  ! end do
                   solvent_PR(mol) = solvent_PR(mol) + sum(solvent_omega_mol(:,mol)*tau)
             end do
 
