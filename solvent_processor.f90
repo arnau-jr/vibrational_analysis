@@ -6,7 +6,8 @@ module solvent_processor
       implicit none 
 
       !Constants and parameters
-      real*8,parameter :: water_atomic_mass(10) = (/1.00782522,0.,0.,0.,0.,12.01,14.01,15.99491502,0.,0./)!TBD
+      real*8,parameter :: water_atomic_mass(18) = (/1.00782522,0.,0.,0.,0.,12.01,14.01,15.99491502,0.,0.,&
+                                                0.,0.,0.,0.,0.,0.,0.,39.95/)!TBD
       real*8,parameter :: solvent_kcal_to_kj = 4.184d0
       real*8,parameter :: electrostatic_constant = 1389.374205 !kJ/mol Angs
 
@@ -53,6 +54,8 @@ module solvent_processor
                         water_Z_mol(i) = 7
                   elseif(solvent_S_mol(i)=="O") then
                         water_Z_mol(i) = 8
+                  elseif(Solvent_S_mol(i)=="Ar" .or.Solvent_S_mol(i)=="AR" .or. Solvent_S_mol(i)=="ar") then
+                        water_Z_mol(i) = 18
                   else
                         write(*,*)"Parsing: atom not recognized"
                   endif
@@ -101,23 +104,23 @@ module solvent_processor
       end subroutine solvent_update_cm_vel
 
 
-      subroutine init_solvent(Nmolecules,Ncentral,unitini,uniteq)
+      subroutine init_solvent(Nmolecules,Nat,Ncentral,unitini,uniteq)
             implicit none
-            integer,intent(in) :: Nmolecules,Ncentral
+            integer,intent(in) :: Nmolecules,Nat,Ncentral
             integer,intent(in) :: unitini,uniteq
             integer            :: mol,i
             character          :: dummy*90
 
             Nmols = Nmolecules
             Natoms_central = Ncentral
-            Natoms_per_mol = 3
+            Natoms_per_mol = Nat
             water_Natoms = Natoms_per_mol*Nmols
             !Allocate quantities
             allocate(solvent_S_mol(water_Natoms),water_M_mol(water_Natoms),water_Z_mol(water_Natoms))
-            allocate(water_xyz_mol(3,3,Nmols),water_xyz_cm(3,3,Nmols),water_xyz_eq(3,3),water_xyz_eckart(3,3,Nmols))
-            allocate(water_cm_pos(3,Nmols))
-            allocate(water_vel_mol(3,3,Nmols),water_vel_cm(3,3,Nmols),water_vel_vib(3,3,Nmols))
-            allocate(water_cm_vel(3,Nmols))
+            allocate(water_xyz_mol(3,Natoms_per_mol,Nmols),water_xyz_cm(3,Natoms_per_mol,Nmols))
+            allocate(water_xyz_eq(3,Natoms_per_mol),water_xyz_eckart(3,Natoms_per_mol,Nmols),water_cm_pos(3,Nmols))
+            allocate(water_vel_mol(3,Natoms_per_mol,Nmols),water_vel_cm(3,Natoms_per_mol,Nmols))
+            allocate(water_vel_vib(3,Natoms_per_mol,Nmols),water_cm_vel(3,Nmols))
             allocate(water_U_eckart(3,3,Nmols),solvent_omega_mol(3,Nmols))
             allocate(solvent_F(3,Natoms_per_mol,Nmols),solvent_PT(Nmols),solvent_PR(Nmols))
 
@@ -127,7 +130,7 @@ module solvent_processor
             end do
             do mol=1,Nmols
                   do i=1,Natoms_per_mol
-                        read(unitini,*)solvent_S_mol(3*(mol-1)+i),water_xyz_mol(:,i,mol),water_vel_mol(:,i,mol)
+                        read(unitini,*)solvent_S_mol(Natoms_per_mol*(mol-1)+i),water_xyz_mol(:,i,mol),water_vel_mol(:,i,mol)
                   end do
             end do
             
@@ -379,7 +382,6 @@ module solvent_processor
             read(unit,*)pot_type
             read(unit,*)units
             read(unit,*)pair_cut
-
             if(pot_type=="LJ") then
                   allocate(pair_coefs(2,Natoms_per_mol,Natoms_central))
             elseif(pot_type=="BU") then
@@ -400,7 +402,7 @@ module solvent_processor
                               pair_coefs(1,a,b) = pair_coefs(1,a,b)*solvent_kcal_to_kj
                         end if
                   end if
-                  if(pot_type=="LJ") then
+                  if(pot_type=="BU") then
                         read(unit,*)a,b,aux1,aux2,aux3
                         pair_coefs(:,a,b) = (/aux1,aux2,aux3/)
                         !Correct units if necessary
@@ -452,21 +454,23 @@ module solvent_processor
                               !Coulomb part
                               ! solvent_F(:,i,mol) = solvent_F(:,i,mol) &
                               ! + distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**3
-                              do a=-n_cells,n_cells
-                              do b=-n_cells,n_cells
-                              do c=-n_cells,n_cells
-                              ! do k=1,3
-                                    ! aux_distv = distv
-                                    aux_distv(1) = distv(1) + a*L_box
-                                    aux_distv(2) = distv(2) + b*L_box
-                                    aux_distv(3) = distv(3) + c*L_box
-                                    aux_dist = sqrt(sum(aux_distv**2))
+                              if(any(abs(q_solvent)>1.d-8)) then
+                                    do a=-n_cells,n_cells
+                                    do b=-n_cells,n_cells
+                                    do c=-n_cells,n_cells
+                                    ! do k=1,3
+                                          ! aux_distv = distv
+                                          aux_distv(1) = distv(1) + a*L_box
+                                          aux_distv(2) = distv(2) + b*L_box
+                                          aux_distv(3) = distv(3) + c*L_box
+                                          aux_dist = sqrt(sum(aux_distv**2))
 
-                                    solvent_F(:,i,mol) = solvent_F(:,i,mol) &
-                                    + aux_distv*electrostatic_constant*q_solvent(i)*q_central(j)/aux_dist**3
-                              end do
-                              end do
-                              end do
+                                          solvent_F(:,i,mol) = solvent_F(:,i,mol) &
+                                          + aux_distv*electrostatic_constant*q_solvent(i)*q_central(j)/aux_dist**3
+                                    end do
+                                    end do
+                                    end do
+                              end if
 
                               ! do k=1,3
                               !       aux_distv = distv
@@ -497,7 +501,7 @@ module solvent_processor
                                           bbu = pair_coefs(2,i,j)
                                           Cbu = pair_coefs(3,i,j)
                                           solvent_F(:,i,mol) = solvent_F(:,i,mol) &
-                                          + (6.d0*Cbu/dist**8 - Abu*bbu*exp(-bbu*dist)/dist)*distv
+                                          - (6.d0*Cbu/dist**8 - Abu*bbu*exp(-bbu*dist)/dist)*distv
                                     end if
                               end if    
                         end do
@@ -512,8 +516,8 @@ module solvent_processor
             real*8  :: total_F(3),tau(3),cm_dist(3)
 
             call solvent_update_cm_vel()
-            call water_get_eckart_frame()
-            call water_comp_angular_vel()
+            if(Natoms_per_mol>1)call water_get_eckart_frame()
+            if(Natoms_per_mol>1)call water_comp_angular_vel()
 
             solvent_PT = 0.d0
             solvent_PR = 0.d0
