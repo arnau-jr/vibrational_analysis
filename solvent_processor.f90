@@ -6,31 +6,31 @@ module solvent_processor
       implicit none 
 
       !Constants and parameters
-      real*8,parameter :: water_atomic_mass(18) = (/1.00782522,0.,0.,0.,0.,12.01,14.01,15.99491502,0.,0.,&
+      real*8,parameter :: solvent_atomic_mass(18) = (/1.00782522,0.,0.,0.,0.,12.01,14.01,15.99491502,0.,0.,&
                                                 0.,0.,0.,0.,0.,0.,0.,39.95/)!TBD
       real*8,parameter :: solvent_kcal_to_kj = 4.184d0
       real*8,parameter :: electrostatic_constant = 1389.374205 !kJ/mol Angs
 
       !Atom information
-      integer               :: Nmols,Natoms_per_mol,water_Natoms
+      integer               :: Nmols,Natoms_per_mol,solvent_Natoms
       character,allocatable :: solvent_S_mol(:)*2 !Atomic symbols of atoms
-      integer,allocatable   :: water_Z_mol(:) !Atomic numbers of atoms
-      real*8,allocatable    :: water_M_mol(:) !Atomic masses of atoms
+      integer,allocatable   :: solvent_Z_mol(:) !Atomic numbers of atoms
+      real*8,allocatable    :: solvent_M_mol(:) !Atomic masses of atoms
       
       !Coordinates (coord,atom,molecule) or (coord,molecule) or (coord,coord,molecule)
-      real*8,allocatable :: water_xyz_mol(:,:,:) !Instantaneous coordinates
-      real*8,allocatable :: water_xyz_cm(:,:,:) !Instantaneous coordinates in CoM frame
-      real*8,allocatable :: water_cm_pos(:,:)
-      real*8,allocatable :: water_xyz_eq(:,:) !Equilibrium coordinates in CoM frame (coord,atom)
-      real*8             :: water_eq_cm_pos(3)
-      real*8,allocatable :: water_xyz_eckart(:,:,:) !Equilibirum coordinates in the Eckart frame
-      real*8,allocatable :: water_U_eckart(:,:,:) !Rotation matrix that transforms from the eckart frame to the original equilibrium frame
+      real*8,allocatable :: solvent_xyz_mol(:,:,:) !Instantaneous coordinates
+      real*8,allocatable :: solvent_xyz_cm(:,:,:) !Instantaneous coordinates in CoM frame
+      real*8,allocatable :: solvent_cm_pos(:,:)
+      real*8,allocatable :: solvent_xyz_eq(:,:) !Equilibrium coordinates in CoM frame (coord,atom)
+      real*8             :: solvent_eq_cm_pos(3)
+      real*8,allocatable :: solvent_xyz_eckart(:,:,:) !Equilibirum coordinates in the Eckart frame
+      real*8,allocatable :: solvent_U_eckart(:,:,:) !Rotation matrix that transforms from the eckart frame to the original equilibrium frame
 
       !Velocities (same as coordinates)
-      real*8,allocatable :: water_vel_mol(:,:,:) !Instantaneous velocities
-      real*8,allocatable :: water_vel_cm(:,:,:) !Instantaneous velocities in CoM frame
-      real*8,allocatable :: water_cm_vel(:,:),solvent_omega_mol(:,:)
-      real*8,allocatable :: water_vel_vib(:,:,:) !Vibrational velocities
+      real*8,allocatable :: solvent_vel_mol(:,:,:) !Instantaneous velocities
+      real*8,allocatable :: solvent_vel_cm(:,:,:) !Instantaneous velocities in CoM frame
+      real*8,allocatable :: solvent_cm_vel(:,:),solvent_omega_mol(:,:)
+      real*8,allocatable :: solvent_vel_vib(:,:,:) !Vibrational velocities
 
       !Forces acting on the solvent
       integer            :: Natoms_central
@@ -45,60 +45,62 @@ module solvent_processor
       subroutine solvent_parse_atomic_symbol()
             implicit none
             integer :: i
-            do i=1,water_Natoms
+            do i=1,solvent_Natoms
                   if(solvent_S_mol(i)=="H") then
-                        water_Z_mol(i) = 1
+                        solvent_Z_mol(i) = 1
                   elseif(solvent_S_mol(i)=="C") then
-                        water_Z_mol(i) = 6
+                        solvent_Z_mol(i) = 6
                   elseif(solvent_S_mol(i)=="N") then
-                        water_Z_mol(i) = 7
+                        solvent_Z_mol(i) = 7
                   elseif(solvent_S_mol(i)=="O") then
-                        water_Z_mol(i) = 8
+                        solvent_Z_mol(i) = 8
                   elseif(Solvent_S_mol(i)=="Ar" .or.Solvent_S_mol(i)=="AR" .or. Solvent_S_mol(i)=="ar") then
-                        water_Z_mol(i) = 18
+                        solvent_Z_mol(i) = 18
                   else
                         write(*,*)"Parsing: atom not recognized"
                   endif
-                  water_M_mol(i) = water_atomic_mass(water_Z_mol(i))
+                  solvent_M_mol(i) = solvent_atomic_mass(solvent_Z_mol(i))
             enddo
       end subroutine solvent_parse_atomic_symbol
 
-      subroutine water_update_cm_coords()
+      subroutine solvent_update_cm_coords()
             implicit none
             real*8              :: total_mass
             integer             :: mol,i
 
             total_mass = 0.d0
-            water_cm_pos = 0.d0
-            water_xyz_cm = 0.d0
+            solvent_cm_pos = 0.d0
+            solvent_xyz_cm = 0.d0
 
             do mol=1,Nmols
                   total_mass = 0.d0
                   do i=1,Natoms_per_mol
-                        total_mass = total_mass + water_M_mol(Natoms_per_mol*(mol-1)+i)
-                        water_cm_pos(:,mol) = water_cm_pos(:,mol) + water_M_mol(Natoms_per_mol*(mol-1)+i)*water_xyz_mol(:,i,mol)
+                        total_mass = total_mass + solvent_M_mol(Natoms_per_mol*(mol-1)+i)
+                        solvent_cm_pos(:,mol) = solvent_cm_pos(:,mol) + &
+                        solvent_M_mol(Natoms_per_mol*(mol-1)+i)*solvent_xyz_mol(:,i,mol)
                   end do
-                  water_cm_pos(:,mol) = water_cm_pos(:,mol)/total_mass
+                  solvent_cm_pos(:,mol) = solvent_cm_pos(:,mol)/total_mass
                   do i=1,Natoms_per_mol
-                        water_xyz_cm(:,i,mol) = water_xyz_mol(:,i,mol) - water_cm_pos(:,mol)
+                        solvent_xyz_cm(:,i,mol) = solvent_xyz_mol(:,i,mol) - solvent_cm_pos(:,mol)
                   end do
             end do
-      end subroutine water_update_cm_coords
+      end subroutine solvent_update_cm_coords
 
       subroutine solvent_update_cm_vel()
             implicit none
             real*8  :: total_mass
             integer :: mol,i
-            water_cm_vel = 0.d0
+            solvent_cm_vel = 0.d0
             do mol=1,Nmols
                   total_mass=0.d0
                   do i=1,Natoms_per_mol
-                        total_mass = total_mass + water_M_mol(Natoms_per_mol*(mol-1)+i)
-                        water_cm_vel(:,mol) = water_cm_vel(:,mol) + water_M_mol(Natoms_per_mol*(mol-1)+i)*water_vel_mol(:,i,mol)
+                        total_mass = total_mass + solvent_M_mol(Natoms_per_mol*(mol-1)+i)
+                        solvent_cm_vel(:,mol) = solvent_cm_vel(:,mol) + &
+                        solvent_M_mol(Natoms_per_mol*(mol-1)+i)*solvent_vel_mol(:,i,mol)
                   end do
-                  water_cm_vel(:,mol) = water_cm_vel(:,mol)/total_mass
+                  solvent_cm_vel(:,mol) = solvent_cm_vel(:,mol)/total_mass
                   do i=1,Natoms_per_mol
-                        water_vel_cm(:,i,mol) = water_vel_mol(:,i,mol) - water_cm_vel(:,mol)
+                        solvent_vel_cm(:,i,mol) = solvent_vel_mol(:,i,mol) - solvent_cm_vel(:,mol)
                   end do
             end do
       end subroutine solvent_update_cm_vel
@@ -114,14 +116,14 @@ module solvent_processor
             Nmols = Nmolecules
             Natoms_central = Ncentral
             Natoms_per_mol = Nat
-            water_Natoms = Natoms_per_mol*Nmols
+            solvent_Natoms = Natoms_per_mol*Nmols
             !Allocate quantities
-            allocate(solvent_S_mol(water_Natoms),water_M_mol(water_Natoms),water_Z_mol(water_Natoms))
-            allocate(water_xyz_mol(3,Natoms_per_mol,Nmols),water_xyz_cm(3,Natoms_per_mol,Nmols))
-            allocate(water_xyz_eq(3,Natoms_per_mol),water_xyz_eckart(3,Natoms_per_mol,Nmols),water_cm_pos(3,Nmols))
-            allocate(water_vel_mol(3,Natoms_per_mol,Nmols),water_vel_cm(3,Natoms_per_mol,Nmols))
-            allocate(water_vel_vib(3,Natoms_per_mol,Nmols),water_cm_vel(3,Nmols))
-            allocate(water_U_eckart(3,3,Nmols),solvent_omega_mol(3,Nmols))
+            allocate(solvent_S_mol(solvent_Natoms),solvent_M_mol(solvent_Natoms),solvent_Z_mol(solvent_Natoms))
+            allocate(solvent_xyz_mol(3,Natoms_per_mol,Nmols),solvent_xyz_cm(3,Natoms_per_mol,Nmols))
+            allocate(solvent_xyz_eq(3,Natoms_per_mol),solvent_xyz_eckart(3,Natoms_per_mol,Nmols),solvent_cm_pos(3,Nmols))
+            allocate(solvent_vel_mol(3,Natoms_per_mol,Nmols),solvent_vel_cm(3,Natoms_per_mol,Nmols))
+            allocate(solvent_vel_vib(3,Natoms_per_mol,Nmols),solvent_cm_vel(3,Nmols))
+            allocate(solvent_U_eckart(3,3,Nmols),solvent_omega_mol(3,Nmols))
             allocate(solvent_F(3,Natoms_per_mol,Nmols),solvent_PT(Nmols),solvent_PR(Nmols))
 
             !Read initial configuration
@@ -130,28 +132,28 @@ module solvent_processor
             end do
             do mol=1,Nmols
                   do i=1,Natoms_per_mol
-                        read(unitini,*)solvent_S_mol(Natoms_per_mol*(mol-1)+i),water_xyz_mol(:,i,mol),water_vel_mol(:,i,mol)
+                        read(unitini,*)solvent_S_mol(Natoms_per_mol*(mol-1)+i),solvent_xyz_mol(:,i,mol),solvent_vel_mol(:,i,mol)
                   end do
             end do
             
-            water_vel_cm = 0.d0
-            water_vel_vib = 0.d0
+            solvent_vel_cm = 0.d0
+            solvent_vel_vib = 0.d0
 
             !Get masses from symbols
             call solvent_parse_atomic_symbol()
             !Obtain equilibrium CoM coordinates
-            call water_update_cm_coords()
+            call solvent_update_cm_coords()
             call solvent_update_cm_vel()
            
             read(uniteq,*)
             read(uniteq,*)
             do i=1,Natoms_per_mol
-                  read(uniteq,*)dummy,water_xyz_eq(:,i)
+                  read(uniteq,*)dummy,solvent_xyz_eq(:,i)
             end do
-            water_eq_cm_pos = 0.d0
+            solvent_eq_cm_pos = 0.d0
       end subroutine init_solvent
 
-      function water_build_pseudo_inertia_moment(mol) result(I)
+      function solvent_build_pseudo_inertia_moment(mol) result(I)
             implicit none
             integer :: mol
             real*8  :: I(3,3)
@@ -160,8 +162,8 @@ module solvent_processor
 
             delta_term = 0.d0
             do j=1,Natoms_per_mol
-                  delta_term = delta_term + water_M_mol(Natoms_per_mol*(mol-1)+j)*&
-                  sum(water_xyz_eckart(:,j,mol)*water_xyz_cm(:,j,mol))
+                  delta_term = delta_term + solvent_M_mol(Natoms_per_mol*(mol-1)+j)*&
+                  sum(solvent_xyz_eckart(:,j,mol)*solvent_xyz_cm(:,j,mol))
             end do
 
             I = 0.d0
@@ -169,14 +171,14 @@ module solvent_processor
                   do b=1,Natoms_per_mol
                         if(a==b) I(a,b) = I(a,b) + delta_term
                         do j=1,Natoms_per_mol
-                              I(a,b) = I(a,b) - water_M_mol(Natoms_per_mol*(mol-1)+j)*&
-                              water_xyz_cm(a,j,mol)*water_xyz_eckart(b,j,mol)
+                              I(a,b) = I(a,b) - solvent_M_mol(Natoms_per_mol*(mol-1)+j)*&
+                              solvent_xyz_cm(a,j,mol)*solvent_xyz_eckart(b,j,mol)
                         end do
                   end do
             end do
-      end function water_build_pseudo_inertia_moment
+      end function solvent_build_pseudo_inertia_moment
 
-      function water_invert_matrix(A) result(Ainv)
+      function solvent_invert_matrix(A) result(Ainv)
             implicit none
             real*8 :: A(3,3),Ainv(3,3)
             real*8 :: det
@@ -194,9 +196,9 @@ module solvent_processor
             Ainv(1,3) = +det * (A(1,2)*A(2,3) - A(1,3)*A(2,2))
             Ainv(2,3) = -det * (A(1,1)*A(2,3) - A(1,3)*A(2,1))
             Ainv(3,3) = +det * (A(1,1)*A(2,2) - A(1,2)*A(2,1))
-      end function water_invert_matrix
+      end function solvent_invert_matrix
 
-      function water_cross_product(v1,v2) result(v3)
+      function solvent_cross_product(v1,v2) result(v3)
             implicit none
             real*8 :: v1(3),v2(3)
             real*8 :: v3(3)
@@ -204,35 +206,35 @@ module solvent_processor
             v3(1) =   v1(2)*v2(3) - v1(3)*v2(2)
             v3(2) = - v1(1)*v2(3) + v1(3)*v2(1)
             v3(3) =   v1(1)*v2(2) - v1(2)*v2(1)
-      end function water_cross_product
+      end function solvent_cross_product
 
-      function water_comp_pseudo_angular_moment(mol) result(l)
+      function solvent_comp_pseudo_angular_moment(mol) result(l)
             implicit none
             integer :: mol
             real*8  :: l(3)
             integer :: i
             l = 0.d0
             do i=1,Natoms_per_mol
-                  l = l + water_M_mol(Natoms_per_mol*(mol-1)+i)*&
-                  water_cross_product(water_xyz_eckart(:,i,mol),water_vel_mol(:,i,mol))
+                  l = l + solvent_M_mol(Natoms_per_mol*(mol-1)+i)*&
+                  solvent_cross_product(solvent_xyz_eckart(:,i,mol),solvent_vel_mol(:,i,mol))
             end do
-      end function water_comp_pseudo_angular_moment
+      end function solvent_comp_pseudo_angular_moment
 
-      subroutine water_comp_angular_vel()
+      subroutine solvent_comp_angular_vel()
             implicit none
             real*8  :: Iab(3,3),Iab_inv(3,3),l(3)
             integer :: mol
             do mol=1,Nmols
-                  Iab = water_build_pseudo_inertia_moment(mol)
-                  Iab_inv = water_invert_matrix(Iab)
+                  Iab = solvent_build_pseudo_inertia_moment(mol)
+                  Iab_inv = solvent_invert_matrix(Iab)
             
-                  l = water_comp_pseudo_angular_moment(mol)
+                  l = solvent_comp_pseudo_angular_moment(mol)
                   
                   solvent_omega_mol(:,mol) = matmul(Iab_inv,l)
             end do
-      end subroutine water_comp_angular_vel
+      end subroutine solvent_comp_angular_vel
 
-      function water_build_eckart_matrix(mol) result(EM)
+      function solvent_build_eckart_matrix(mol) result(EM)
             implicit none
             integer :: mol
             real*8  :: xpa,xma,ypa,yma,zpa,zma
@@ -240,32 +242,32 @@ module solvent_processor
             integer :: a
             EM = 0.d0
             do a=1,Natoms_per_mol
-                  xpa = water_xyz_eq(1,a) + water_xyz_cm(1,a,mol)
-                  xma = water_xyz_eq(1,a) - water_xyz_cm(1,a,mol)
+                  xpa = solvent_xyz_eq(1,a) + solvent_xyz_cm(1,a,mol)
+                  xma = solvent_xyz_eq(1,a) - solvent_xyz_cm(1,a,mol)
 
-                  ypa = water_xyz_eq(2,a) + water_xyz_cm(2,a,mol)
-                  yma = water_xyz_eq(2,a) - water_xyz_cm(2,a,mol)
+                  ypa = solvent_xyz_eq(2,a) + solvent_xyz_cm(2,a,mol)
+                  yma = solvent_xyz_eq(2,a) - solvent_xyz_cm(2,a,mol)
 
-                  zpa = water_xyz_eq(3,a) + water_xyz_cm(3,a,mol)
-                  zma = water_xyz_eq(3,a) - water_xyz_cm(3,a,mol)
+                  zpa = solvent_xyz_eq(3,a) + solvent_xyz_cm(3,a,mol)
+                  zma = solvent_xyz_eq(3,a) - solvent_xyz_cm(3,a,mol)
 
                   !Diagonal
-                  EM(1,1) = EM(1,1) + water_M_mol(a)*(xma**2 + yma**2 + zma**2)
-                  EM(2,2) = EM(2,2) + water_M_mol(a)*(xma**2 + ypa**2 + zpa**2)
-                  EM(3,3) = EM(3,3) + water_M_mol(a)*(xpa**2 + yma**2 + zpa**2)
-                  EM(4,4) = EM(4,4) + water_M_mol(a)*(xpa**2 + ypa**2 + zma**2)
+                  EM(1,1) = EM(1,1) + solvent_M_mol(a)*(xma**2 + yma**2 + zma**2)
+                  EM(2,2) = EM(2,2) + solvent_M_mol(a)*(xma**2 + ypa**2 + zpa**2)
+                  EM(3,3) = EM(3,3) + solvent_M_mol(a)*(xpa**2 + yma**2 + zpa**2)
+                  EM(4,4) = EM(4,4) + solvent_M_mol(a)*(xpa**2 + ypa**2 + zma**2)
 
                   !Rest of 1st row
-                  EM(1,2) = EM(1,2) + water_M_mol(a)*(ypa*zma - yma*zpa)
-                  EM(1,3) = EM(1,3) + water_M_mol(a)*(xma*zpa - xpa*zma)
-                  EM(1,4) = EM(1,4) + water_M_mol(a)*(xpa*yma - xma*ypa)
+                  EM(1,2) = EM(1,2) + solvent_M_mol(a)*(ypa*zma - yma*zpa)
+                  EM(1,3) = EM(1,3) + solvent_M_mol(a)*(xma*zpa - xpa*zma)
+                  EM(1,4) = EM(1,4) + solvent_M_mol(a)*(xpa*yma - xma*ypa)
 
                   !Rest of 2nd row
-                  EM(2,3) = EM(2,3) + water_M_mol(a)*(xma*yma - xpa*ypa)
-                  EM(2,4) = EM(2,4) + water_M_mol(a)*(xma*zma - xpa*zpa)
+                  EM(2,3) = EM(2,3) + solvent_M_mol(a)*(xma*yma - xpa*ypa)
+                  EM(2,4) = EM(2,4) + solvent_M_mol(a)*(xma*zma - xpa*zpa)
 
                   !Rest of 3rd row
-                  EM(3,4) = EM(3,4) + water_M_mol(a)*(yma*zma - ypa*zpa)
+                  EM(3,4) = EM(3,4) + solvent_M_mol(a)*(yma*zma - ypa*zpa)
             end do
 
             !Symmetrize
@@ -277,9 +279,9 @@ module solvent_processor
             EM(4,2) = EM(2,4)
 
             EM(4,3) = EM(3,4)
-      end function water_build_eckart_matrix
+      end function solvent_build_eckart_matrix
 
-      function water_build_direction_cosine_matrix(V) result (U)
+      function solvent_build_direction_cosine_matrix(V) result (U)
             implicit none
             real*8 :: V(4)
             real*8 :: U(3,3)
@@ -303,7 +305,7 @@ module solvent_processor
             U(3,1) = 2.d0*(q1*q3 + q0*q2)
             U(3,2) = 2.d0*(q2*q3 - q0*q1)
             U(3,3) = q0**2 - q1**2 - q2**2 + q3**2
-      end function water_build_direction_cosine_matrix
+      end function solvent_build_direction_cosine_matrix
 
       subroutine check_eckart_conditions()
             implicit none
@@ -311,16 +313,16 @@ module solvent_processor
             real*8,parameter :: eps=1.d-10
             integer          :: i,mol
             do mol=1,Nmols
-                  disp = water_xyz_cm(:,:,mol) - water_xyz_eckart(:,:,mol)
+                  disp = solvent_xyz_cm(:,:,mol) - solvent_xyz_eckart(:,:,mol)
                   tra_cond = 0.d0
                   rot_cond = 0.d0
                   comb_cond = 0.d0
                   do i=1,Natoms_per_mol
-                        tra_cond  = tra_cond  + water_M_mol(Natoms_per_mol*(mol-1)+i)*disp(:,i)
-                        rot_cond  = rot_cond  + water_M_mol(Natoms_per_mol*(mol-1)+i)*&
-                        water_cross_product(water_xyz_eckart(:,i,mol),disp(:,i))
-                        comb_cond = comb_cond + water_M_mol(Natoms_per_mol*(mol-1)+i)*&
-                        water_cross_product(water_xyz_eckart(:,i,mol),water_xyz_cm(:,i,mol))
+                        tra_cond  = tra_cond  + solvent_M_mol(Natoms_per_mol*(mol-1)+i)*disp(:,i)
+                        rot_cond  = rot_cond  + solvent_M_mol(Natoms_per_mol*(mol-1)+i)*&
+                        solvent_cross_product(solvent_xyz_eckart(:,i,mol),disp(:,i))
+                        comb_cond = comb_cond + solvent_M_mol(Natoms_per_mol*(mol-1)+i)*&
+                        solvent_cross_product(solvent_xyz_eckart(:,i,mol),solvent_xyz_cm(:,i,mol))
                   end do
 
                   if(any(tra_cond > eps) .or. any(rot_cond > eps) .or. any(comb_cond > eps)) then
@@ -335,27 +337,27 @@ module solvent_processor
       end subroutine check_eckart_conditions
 
 
-      subroutine water_get_eckart_frame()
+      subroutine solvent_get_eckart_frame()
             implicit none
             real*8             :: EM(4,4),U(3,3)
             real*8             :: work(100),d(4)
             integer            :: i,mol,ierror
 
-            call water_update_cm_coords()
+            call solvent_update_cm_coords()
             do mol=1,Nmols
-                  EM = water_build_eckart_matrix(mol)
+                  EM = solvent_build_eckart_matrix(mol)
 
                   call dsyev("V","U",4,EM,4,d,work,100,ierror)
 
-                  U = water_build_direction_cosine_matrix(EM(:,1))
+                  U = solvent_build_direction_cosine_matrix(EM(:,1))
 
                   do i=1,Natoms_per_mol
-                        water_xyz_eckart(:,i,mol) = matmul(transpose(U),water_xyz_eq(:,i))
+                        solvent_xyz_eckart(:,i,mol) = matmul(transpose(U),solvent_xyz_eq(:,i))
                   end do
-                  water_U_eckart(:,:,mol) = U
+                  solvent_U_eckart(:,:,mol) = U
             end do
             call check_eckart_conditions()
-      end subroutine water_get_eckart_frame
+      end subroutine solvent_get_eckart_frame
 
 
       subroutine init_solvent_forcefield(unit)
@@ -440,14 +442,14 @@ module solvent_processor
             real*8             :: aux_distv(3),aux_dist
             real*8             :: epsilon,sigma
             real*8             :: Abu,bbu,Cbu
-            integer            :: i,j,k,l,mol
+            integer            :: i,j,mol
             integer            :: a,b,c
             
             solvent_F = 0.d0
             do mol=1,Nmols
                   do i=1,Natoms_per_mol
                         do j=1,Natoms_central
-                              distv = water_xyz_mol(:,i,mol)-xyz_central(:,j)
+                              distv = solvent_xyz_mol(:,i,mol)-xyz_central(:,j)
                               distv = distv-L_box*nint(distv/L_box)
                               dist = sqrt(sum(distv**2))
 
@@ -512,24 +514,24 @@ module solvent_processor
       subroutine comp_power_on_solvent(cm_central)
             implicit none
             real*8,intent(in) :: cm_central(3)
-            integer :: mol,i,j
+            integer :: mol
             real*8  :: total_F(3),tau(3),cm_dist(3)
 
             call solvent_update_cm_vel()
-            if(Natoms_per_mol>1)call water_get_eckart_frame()
-            if(Natoms_per_mol>1)call water_comp_angular_vel()
+            if(Natoms_per_mol>1)call solvent_get_eckart_frame()
+            if(Natoms_per_mol>1)call solvent_comp_angular_vel()
 
             solvent_PT = 0.d0
             solvent_PR = 0.d0
 
             do mol=1,Nmols
                   total_F = sum(solvent_F(:,:,mol),2)
-                  cm_dist = water_cm_pos(:,mol) - cm_central
-                  tau = water_cross_product(cm_dist,total_F)
+                  cm_dist = solvent_cm_pos(:,mol) - cm_central
+                  tau = solvent_cross_product(cm_dist,total_F)
 
-                  solvent_PT(mol) = solvent_PT(mol) + sum(total_F*water_cm_vel(:,mol))
+                  solvent_PT(mol) = solvent_PT(mol) + sum(total_F*solvent_cm_vel(:,mol))
                   ! do i=1,Natoms_per_mol
-                  !       solvent_PT(mol) = solvent_PT(mol) + sum(solvent_F(:,i,mol)*water_vel_mol(:,i,mol))
+                  !       solvent_PT(mol) = solvent_PT(mol) + sum(solvent_F(:,i,mol)*solvent_vel_mol(:,i,mol))
                   ! end do
                   solvent_PR(mol) = solvent_PR(mol) + sum(solvent_omega_mol(:,mol)*tau)
             end do
