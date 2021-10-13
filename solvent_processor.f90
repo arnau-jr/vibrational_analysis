@@ -25,6 +25,7 @@ module solvent_processor
       real*8             :: solvent_eq_cm_pos(3)
       real*8,allocatable :: solvent_xyz_eckart(:,:,:) !Equilibirum coordinates in the Eckart frame
       real*8,allocatable :: solvent_U_eckart(:,:,:) !Rotation matrix that transforms from the eckart frame to the original equilibrium frame
+      real*8             :: L_box !Size of the solvent box
 
       !Velocities (same as coordinates)
       real*8,allocatable :: solvent_vel_mol(:,:,:) !Instantaneous velocities
@@ -38,7 +39,9 @@ module solvent_processor
       real*8,allocatable :: pair_coefs(:,:,:) !(coef,solvent types,central types)
       real*8             :: pair_cut
       real*8,allocatable :: q_solvent(:),q_central(:)
-      real*8,allocatable :: solvent_F(:,:,:),solvent_PT(:),solvent_PR(:)
+      real*8,allocatable :: solvent_F(:,:,:,:) 
+      !(i,j,k,l) component i that atom j of the central molecule does on atom k of molecule l
+      real*8,allocatable :: solvent_PT(:),solvent_PR(:)
 
       contains
 
@@ -66,6 +69,8 @@ module solvent_processor
       subroutine solvent_update_cm_coords()
             implicit none
             real*8              :: total_mass
+            real*8              :: distv(3)
+            real*8              :: xyz_aux(3,Natoms_per_mol)
             integer             :: mol,i
 
             total_mass = 0.d0
@@ -73,15 +78,22 @@ module solvent_processor
             solvent_xyz_cm = 0.d0
 
             do mol=1,Nmols
+                  xyz_aux(:,1) = solvent_xyz_mol(:,1,mol)
+                  do i=2,Natoms_per_mol
+                        distv = solvent_xyz_mol(:,1,mol) - solvent_xyz_mol(:,i,mol)
+                        distv = distv-L_box*nint(distv/L_box)
+                        xyz_aux(:,i) = solvent_xyz_mol(:,1,mol) - distv
+                  end do
+
                   total_mass = 0.d0
                   do i=1,Natoms_per_mol
                         total_mass = total_mass + solvent_M_mol(Natoms_per_mol*(mol-1)+i)
                         solvent_cm_pos(:,mol) = solvent_cm_pos(:,mol) + &
-                        solvent_M_mol(Natoms_per_mol*(mol-1)+i)*solvent_xyz_mol(:,i,mol)
+                        solvent_M_mol(Natoms_per_mol*(mol-1)+i)*xyz_aux(:,i)
                   end do
                   solvent_cm_pos(:,mol) = solvent_cm_pos(:,mol)/total_mass
                   do i=1,Natoms_per_mol
-                        solvent_xyz_cm(:,i,mol) = solvent_xyz_mol(:,i,mol) - solvent_cm_pos(:,mol)
+                        solvent_xyz_cm(:,i,mol) = xyz_aux(:,i) - solvent_cm_pos(:,mol)
                   end do
             end do
       end subroutine solvent_update_cm_coords
@@ -106,9 +118,10 @@ module solvent_processor
       end subroutine solvent_update_cm_vel
 
 
-      subroutine init_solvent(Nmolecules,Nat,Ncentral,unitini,uniteq)
+      subroutine init_solvent(Nmolecules,Nat,Ncentral,l,unitini,uniteq)
             implicit none
             integer,intent(in) :: Nmolecules,Nat,Ncentral
+            real*8,intent(in)  :: l
             integer,intent(in) :: unitini,uniteq
             integer            :: mol,i
             character          :: dummy*90
@@ -117,6 +130,7 @@ module solvent_processor
             Natoms_central = Ncentral
             Natoms_per_mol = Nat
             solvent_Natoms = Natoms_per_mol*Nmols
+            L_box = l
             !Allocate quantities
             allocate(solvent_S_mol(solvent_Natoms),solvent_M_mol(solvent_Natoms),solvent_Z_mol(solvent_Natoms))
             allocate(solvent_xyz_mol(3,Natoms_per_mol,Nmols),solvent_xyz_cm(3,Natoms_per_mol,Nmols))
@@ -124,7 +138,7 @@ module solvent_processor
             allocate(solvent_vel_mol(3,Natoms_per_mol,Nmols),solvent_vel_cm(3,Natoms_per_mol,Nmols))
             allocate(solvent_vel_vib(3,Natoms_per_mol,Nmols),solvent_cm_vel(3,Nmols))
             allocate(solvent_U_eckart(3,3,Nmols),solvent_omega_mol(3,Nmols))
-            allocate(solvent_F(3,Natoms_per_mol,Nmols),solvent_PT(Nmols),solvent_PR(Nmols))
+            allocate(solvent_F(3,Natoms_central,Natoms_per_mol,Nmols),solvent_PT(Nmols),solvent_PR(Nmols))
 
             !Read initial configuration
             do i=1,9
@@ -434,9 +448,9 @@ module solvent_processor
             10 continue
       end subroutine init_solvent_forcefield
 
-      subroutine comp_forces_on_solvent(xyz_central,L_box,n_cells)
+      subroutine comp_forces_on_solvent(xyz_central,n_cells)
             implicit none
-            real*8,intent(in)  :: xyz_central(3,Natoms_central),L_box
+            real*8,intent(in)  :: xyz_central(3,Natoms_central)
             integer,intent(in) :: n_cells
             real*8             :: distv(3),dist
             real*8             :: aux_distv(3),aux_dist
@@ -454,25 +468,25 @@ module solvent_processor
                               dist = sqrt(sum(distv**2))
 
                               !Coulomb part
-                              ! solvent_F(:,i,mol) = solvent_F(:,i,mol) &
-                              ! + distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**3
-                              if(any(abs(q_solvent)>1.d-8)) then
-                                    do a=-n_cells,n_cells
-                                    do b=-n_cells,n_cells
-                                    do c=-n_cells,n_cells
-                                    ! do k=1,3
-                                          ! aux_distv = distv
-                                          aux_distv(1) = distv(1) + a*L_box
-                                          aux_distv(2) = distv(2) + b*L_box
-                                          aux_distv(3) = distv(3) + c*L_box
-                                          aux_dist = sqrt(sum(aux_distv**2))
+                              solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
+                              + distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**3
+                              ! if(any(abs(q_solvent)>1.d-8)) then
+                              !       do a=-n_cells,n_cells
+                              !       do b=-n_cells,n_cells
+                              !       do c=-n_cells,n_cells
+                              !       ! do k=1,3
+                              !             ! aux_distv = distv
+                              !             aux_distv(1) = distv(1) + a*L_box
+                              !             aux_distv(2) = distv(2) + b*L_box
+                              !             aux_distv(3) = distv(3) + c*L_box
+                              !             aux_dist = sqrt(sum(aux_distv**2))
 
-                                          solvent_F(:,i,mol) = solvent_F(:,i,mol) &
-                                          + aux_distv*electrostatic_constant*q_solvent(i)*q_central(j)/aux_dist**3
-                                    end do
-                                    end do
-                                    end do
-                              end if
+                              !             solvent_F(:,i,mol) = solvent_F(:,i,mol) &
+                              !             + aux_distv*electrostatic_constant*q_solvent(i)*q_central(j)/aux_dist**3
+                              !       end do
+                              !       end do
+                              !       end do
+                              ! end if
 
                               ! do k=1,3
                               !       aux_distv = distv
@@ -496,13 +510,13 @@ module solvent_processor
                                     if(pair_pot_type=="LJ") then
                                           epsilon = pair_coefs(1,i,j)
                                           sigma = pair_coefs(2,i,j)
-                                          solvent_F(:,i,mol) = solvent_F(:,i,mol) &
+                                          solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
                                           + epsilon*((48.d0*sigma**12)/dist**14 - (24.d0*sigma**6)/dist**8)*distv
                                     else if(pair_pot_type=="BU") then
                                           Abu = pair_coefs(1,i,j)
                                           bbu = pair_coefs(2,i,j)
                                           Cbu = pair_coefs(3,i,j)
-                                          solvent_F(:,i,mol) = solvent_F(:,i,mol) &
+                                          solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
                                           - (6.d0*Cbu/dist**8 - Abu*bbu*exp(-bbu*dist)/dist)*distv
                                     end if
                               end if    
@@ -511,11 +525,11 @@ module solvent_processor
             end do
       end subroutine comp_forces_on_solvent
 
-      subroutine comp_power_on_solvent(cm_central)
+      subroutine comp_power_on_solvent(xyz_central,cm_central)
             implicit none
-            real*8,intent(in) :: cm_central(3)
-            integer :: mol
-            real*8  :: total_F(3),tau(3),cm_dist(3)
+            real*8,intent(in) :: xyz_central(3,Natoms_central),cm_central(3)
+            integer :: i,j,mol
+            real*8  :: total_F(3),vrot(3),distv(3)
 
             call solvent_update_cm_vel()
             if(Natoms_per_mol>1)call solvent_get_eckart_frame()
@@ -523,19 +537,24 @@ module solvent_processor
 
             solvent_PT = 0.d0
             solvent_PR = 0.d0
+            do j=1,Natoms_central
+                  do mol=1,Nmols
+                        total_F = sum(solvent_F(:,j,:,mol),2)
 
-            do mol=1,Nmols
-                  total_F = sum(solvent_F(:,:,mol),2)
-                  cm_dist = solvent_cm_pos(:,mol) - cm_central
-                  tau = solvent_cross_product(cm_dist,total_F)
+                        solvent_PT(mol) = solvent_PT(mol) + sum(total_F*solvent_cm_vel(:,mol))
 
-                  solvent_PT(mol) = solvent_PT(mol) + sum(total_F*solvent_cm_vel(:,mol))
-                  ! do i=1,Natoms_per_mol
-                  !       solvent_PT(mol) = solvent_PT(mol) + sum(solvent_F(:,i,mol)*solvent_vel_mol(:,i,mol))
-                  ! end do
-                  solvent_PR(mol) = solvent_PR(mol) + sum(solvent_omega_mol(:,mol)*tau)
+                        do i=1,Natoms_per_mol
+
+                              distv = solvent_xyz_mol(:,i,mol)-xyz_central(:,j)
+                              distv = distv-L_box*nint(distv/L_box)
+
+                              ! tau = solvent_cross_product(distv,solvent_F(:,j,i,mol))
+                              vrot = solvent_cross_product(solvent_omega_mol(:,mol),solvent_xyz_cm(:,i,mol))
+                              ! solvent_PR(mol) = solvent_PR(mol) + sum(solvent_omega_mol(:,mol)*tau)
+                              solvent_PR(mol) = solvent_PR(mol) + sum(vrot*solvent_F(:,j,i,mol))
+                        end do
+                  end do
             end do
-
       end subroutine comp_power_on_solvent
 
 

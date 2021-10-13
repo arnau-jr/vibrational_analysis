@@ -327,7 +327,7 @@ module vibration
 
       function comp_rotational_energy(omega) result(Erot)
             implicit none
-            real*8  :: omega(3),xyz_cm(3,Natoms)
+            real*8  :: omega(3)
             real*8  :: Erot
             integer :: i
             Erot = 0.d0
