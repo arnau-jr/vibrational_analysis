@@ -448,16 +448,14 @@ module solvent_processor
             10 continue
       end subroutine init_solvent_forcefield
 
-      subroutine comp_forces_on_solvent(xyz_central,n_cells)
+      subroutine comp_forces_on_solvent(xyz_central)
             implicit none
             real*8,intent(in)  :: xyz_central(3,Natoms_central)
-            integer,intent(in) :: n_cells
             real*8             :: distv(3),dist
-            real*8             :: aux_distv(3),aux_dist
             real*8             :: epsilon,sigma
             real*8             :: Abu,bbu,Cbu
             integer            :: i,j,mol
-            integer            :: a,b,c
+
             
             solvent_F = 0.d0
             do mol=1,Nmols
@@ -470,40 +468,6 @@ module solvent_processor
                               !Coulomb part
                               solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
                               + distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**3
-                              ! if(any(abs(q_solvent)>1.d-8)) then
-                              !       do a=-n_cells,n_cells
-                              !       do b=-n_cells,n_cells
-                              !       do c=-n_cells,n_cells
-                              !       ! do k=1,3
-                              !             ! aux_distv = distv
-                              !             aux_distv(1) = distv(1) + a*L_box
-                              !             aux_distv(2) = distv(2) + b*L_box
-                              !             aux_distv(3) = distv(3) + c*L_box
-                              !             aux_dist = sqrt(sum(aux_distv**2))
-
-                              !             solvent_F(:,i,mol) = solvent_F(:,i,mol) &
-                              !             + aux_distv*electrostatic_constant*q_solvent(i)*q_central(j)/aux_dist**3
-                              !       end do
-                              !       end do
-                              !       end do
-                              ! end if
-
-                              ! do k=1,3
-                              !       aux_distv = distv
-                              !       aux_distv(k) = aux_distv(k) + l*L_box
-                              !       aux_dist = sqrt(sum(aux_distv**2))
-
-                              !       solvent_F(:,i,mol) = solvent_F(:,i,mol) &
-                              !       + aux_distv*electrostatic_constant*q_solvent(i)*q_central(j)/aux_dist**3
-
-                              !       aux_distv = distv
-                              !       aux_distv(k) = aux_distv(k) - l*L_box
-                              !       aux_dist = sqrt(sum(aux_distv**2))
-
-                              !       solvent_F(:,i,mol) = solvent_F(:,i,mol) &
-                              !       + aux_distv*electrostatic_constant*q_solvent(i)*q_central(j)/aux_dist**3
-                              ! end do
-
 
                               !Pair part
                               if(dist<pair_cut) then
@@ -525,9 +489,9 @@ module solvent_processor
             end do
       end subroutine comp_forces_on_solvent
 
-      subroutine comp_power_on_solvent(xyz_central,cm_central)
+      subroutine comp_power_on_solvent(xyz_central)
             implicit none
-            real*8,intent(in) :: xyz_central(3,Natoms_central),cm_central(3)
+            real*8,intent(in) :: xyz_central(3,Natoms_central)
             integer :: i,j,mol
             real*8  :: total_F(3),vrot(3),distv(3)
 
