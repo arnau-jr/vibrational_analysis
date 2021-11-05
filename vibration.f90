@@ -206,6 +206,28 @@ module vibration
             U_eckart = U
       end subroutine get_eckart_frame
 
+      subroutine get_eckart_frame_with_pbc(L_box)
+            implicit none
+            real*8,intent(in) :: L_box
+            real*8            :: EM(4,4),U(3,3)
+            real*8            :: work(100),d(4)
+            integer           :: i,ierror
+
+            call update_cm_coords_with_pbc(L_box)
+
+            EM = build_eckart_matrix()
+
+            call dsyev("V","U",4,EM,4,d,work,100,ierror)
+
+            U = build_direction_cosine_matrix(EM(:,1))
+
+            do i=1,Natoms
+                  xyz_eckart(:,i) = matmul(transpose(U),xyz_eq(:,i))
+            end do
+            call check_eckart_conditions()
+            U_eckart = U
+      end subroutine get_eckart_frame_with_pbc
+
       subroutine check_eckart_conditions()
             implicit none
             real*8           :: tra_cond(3),rot_cond(3),comb_cond(3),disp(3,Natoms)

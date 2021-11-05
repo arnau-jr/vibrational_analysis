@@ -73,6 +73,35 @@ module molecule
             end do
       end subroutine update_cm_coords
 
+      subroutine update_cm_coords_with_pbc(L_box)
+            implicit none
+            real*8,intent(in) :: L_box
+            real*8            :: total_mass
+            real*8            :: distv(3)
+            real*8            :: xyz_aux(3,Natoms)
+            integer           :: i
+
+            total_mass = 0.d0
+            cm_pos = 0.d0
+            xyz_cm = 0.d0
+
+            xyz_aux(:,1) = xyz_mol(:,1)
+            do i=2,Natoms
+                  distv = xyz_mol(:,1) - xyz_mol(:,i)
+                  distv = distv-L_box*nint(distv/L_box)
+                  xyz_aux(:,i) = xyz_mol(:,1) - distv
+            end do
+
+            do i=1,Natoms
+                  total_mass = total_mass + M_mol(i)
+                  cm_pos(:) = cm_pos(:) + M_mol(i)*xyz_aux(:,i)
+            end do
+            cm_pos = cm_pos/total_mass
+            do i=1,Natoms
+                  xyz_cm(:,i) = xyz_aux(:,i) - cm_pos(:)
+            end do
+      end subroutine update_cm_coords_with_pbc
+
 
       subroutine init_molecule(unit)
             implicit none
