@@ -460,6 +460,7 @@ module solvent_processor
 
             
             solvent_F = 0.d0
+            solvent_U = 0.d0
             do mol=1,Nmols
                   do i=1,Natoms_per_mol
                         do j=1,Natoms_central
