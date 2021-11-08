@@ -39,8 +39,9 @@ module solvent_processor
       real*8,allocatable :: pair_coefs(:,:,:) !(coef,solvent types,central types)
       real*8             :: pair_cut
       real*8,allocatable :: q_solvent(:),q_central(:)
-      real*8,allocatable :: solvent_F(:,:,:,:) 
+      real*8,allocatable :: solvent_F(:,:,:,:),solvent_U(:,:,:) 
       !(i,j,k,l) component i that atom j of the central molecule does on atom k of molecule l
+      !(j,k,l) interaction energy of atom j of the central molecule and atom k of molecule l
       real*8,allocatable :: solvent_PT(:),solvent_PR(:)
 
       contains
@@ -138,7 +139,8 @@ module solvent_processor
             allocate(solvent_vel_mol(3,Natoms_per_mol,Nmols),solvent_vel_cm(3,Natoms_per_mol,Nmols))
             allocate(solvent_vel_vib(3,Natoms_per_mol,Nmols),solvent_cm_vel(3,Nmols))
             allocate(solvent_U_eckart(3,3,Nmols),solvent_omega_mol(3,Nmols))
-            allocate(solvent_F(3,Natoms_central,Natoms_per_mol,Nmols),solvent_PT(Nmols),solvent_PR(Nmols))
+            allocate(solvent_F(3,Natoms_central,Natoms_per_mol,Nmols),solvent_U(Natoms_central,Natoms_per_mol,Nmols))
+            allocate(solvent_PT(Nmols),solvent_PR(Nmols))
 
             !Read initial configuration
             do i=1,9
@@ -469,6 +471,9 @@ module solvent_processor
                               solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
                               + distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**3
 
+                              solvent_U(j,i,mol) = solvent_U(j,i,mol) &
+                              + electrostatic_constant*q_solvent(i)*q_central(j)/dist
+
                               !Pair part
                               if(dist<pair_cut) then
                                     if(pair_pot_type=="LJ") then
@@ -476,12 +481,18 @@ module solvent_processor
                                           sigma = pair_coefs(2,i,j)
                                           solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
                                           + epsilon*((48.d0*sigma**12)/dist**14 - (24.d0*sigma**6)/dist**8)*distv
+
+                                          solvent_U(j,i,mol) = solvent_U(j,i,mol) &
+                                          + 4.d0*epsilon*(sigma**12/dist**12 - sigma**6/dist**6)
                                     else if(pair_pot_type=="BU") then
                                           Abu = pair_coefs(1,i,j)
                                           bbu = pair_coefs(2,i,j)
                                           Cbu = pair_coefs(3,i,j)
                                           solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
                                           - (6.d0*Cbu/dist**8 - Abu*bbu*exp(-bbu*dist)/dist)*distv
+
+                                          solvent_U(j,i,mol) = solvent_U(j,i,mol) &
+                                          + Abu*exp(-bbu*dist) - Cbu/dist**6
                                     end if
                               end if    
                         end do
