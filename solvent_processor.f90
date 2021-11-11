@@ -44,6 +44,7 @@ module solvent_processor
       !(j,k,l) interaction energy of atom j of the central molecule and atom k of molecule l
       real*8,allocatable :: solvent_PT(:),solvent_PR(:)
 
+      real*8,allocatable :: solvent_Fcentral(:,:,:,:)
       contains
 
       subroutine solvent_parse_atomic_symbol()
@@ -99,6 +100,18 @@ module solvent_processor
             end do
       end subroutine solvent_update_cm_coords
 
+      function solvent_comp_kinetic_energy() result(K)
+            implicit none
+            real*8 :: K
+            integer :: mol,i
+            K = 0.d0
+            do mol=1,Nmols
+                  do i=1,Natoms_per_mol
+                        K = K + 0.5d0*solvent_M_mol(Natoms_per_mol*(mol-1)+i)*sum(solvent_vel_mol(:,i,mol)**2)
+                  end do
+            end do
+      end function solvent_comp_kinetic_energy
+
       subroutine solvent_update_cm_vel()
             implicit none
             real*8  :: total_mass
@@ -141,7 +154,7 @@ module solvent_processor
             allocate(solvent_U_eckart(3,3,Nmols),solvent_omega_mol(3,Nmols))
             allocate(solvent_F(3,Natoms_central,Natoms_per_mol,Nmols),solvent_U(Natoms_central,Natoms_per_mol,Nmols))
             allocate(solvent_PT(Nmols),solvent_PR(Nmols))
-
+            allocate(solvent_Fcentral(3,Natoms_central,Natoms_per_mol,Nmols))
             !Read initial configuration
             do i=1,9
                   read(unitini,*)
@@ -484,7 +497,7 @@ module solvent_processor
                                           + epsilon*((48.d0*sigma**12)/dist**14 - (24.d0*sigma**6)/dist**8)*distv
 
                                           solvent_U(j,i,mol) = solvent_U(j,i,mol) &
-                                          + 4.d0*epsilon*(sigma**12/dist**12 - sigma**6/dist**6)
+                                          + 4.d0*epsilon*((sigma/dist)**12 - (sigma/dist)**6)
                                     else if(pair_pot_type=="BU") then
                                           Abu = pair_coefs(1,i,j)
                                           bbu = pair_coefs(2,i,j)
@@ -500,6 +513,57 @@ module solvent_processor
                   end do
             end do
       end subroutine comp_forces_on_solvent
+
+      subroutine comp_forces_on_central(xyz_central)
+            implicit none
+            real*8,intent(in)  :: xyz_central(3,Natoms_central)
+            real*8             :: distv(3),dist
+            real*8             :: epsilon,sigma
+            real*8             :: Abu,bbu,Cbu
+            integer            :: i,j,mol
+
+            
+            solvent_Fcentral = 0.d0
+            ! solvent_U = 0.d0
+            do mol=1,Nmols
+                  do i=1,Natoms_per_mol
+                        do j=1,Natoms_central
+                              distv = xyz_central(:,j)-solvent_xyz_mol(:,i,mol)
+                              distv = distv-L_box*nint(distv/L_box)
+                              dist = sqrt(sum(distv**2))
+
+                              !Coulomb part
+                              solvent_Fcentral(:,j,i,mol) = solvent_Fcentral(:,j,i,mol) &
+                              + distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**3
+
+                              ! solvent_U(j,i,mol) = solvent_U(j,i,mol) &
+                              ! + electrostatic_constant*q_solvent(i)*q_central(j)/dist
+
+                              !Pair part
+                              if(dist<pair_cut) then
+                                    if(pair_pot_type=="LJ") then
+                                          epsilon = pair_coefs(1,i,j)
+                                          sigma = pair_coefs(2,i,j)
+                                          solvent_Fcentral(:,j,i,mol) = solvent_Fcentral(:,j,i,mol) &
+                                          + epsilon*((48.d0*sigma**12)/dist**14 - (24.d0*sigma**6)/dist**8)*distv
+
+                                          ! solvent_U(j,i,mol) = solvent_U(j,i,mol) &
+                                          ! + 4.d0*epsilon*(sigma**12/dist**12 - sigma**6/dist**6)
+                                    else if(pair_pot_type=="BU") then
+                                          Abu = pair_coefs(1,i,j)
+                                          bbu = pair_coefs(2,i,j)
+                                          Cbu = pair_coefs(3,i,j)
+                                          solvent_Fcentral(:,j,i,mol) = solvent_Fcentral(:,j,i,mol) &
+                                          - (6.d0*Cbu/dist**8 - Abu*bbu*exp(-bbu*dist)/dist)*distv
+
+                                          ! solvent_U(j,i,mol) = solvent_U(j,i,mol) &
+                                          ! + Abu*exp(-bbu*dist) - Cbu/dist**6
+                                    end if
+                              end if    
+                        end do
+                  end do
+            end do
+      end subroutine comp_forces_on_central
 
       subroutine comp_power_on_solvent(xyz_central)
             implicit none
@@ -524,9 +588,7 @@ module solvent_processor
                               distv = solvent_xyz_mol(:,i,mol)-xyz_central(:,j)
                               distv = distv-L_box*nint(distv/L_box)
 
-                              ! tau = solvent_cross_product(distv,solvent_F(:,j,i,mol))
                               vrot = solvent_cross_product(solvent_omega_mol(:,mol),solvent_xyz_cm(:,i,mol))
-                              ! solvent_PR(mol) = solvent_PR(mol) + sum(solvent_omega_mol(:,mol)*tau)
                               solvent_PR(mol) = solvent_PR(mol) + sum(vrot*solvent_F(:,j,i,mol))
                         end do
                   end do
