@@ -6,7 +6,8 @@ module molecule
       implicit none 
 
       !Constants and parameters
-      real*8,parameter :: atomic_mass(10) = (/1.00782522,0.,0.,0.,0.,12.01,14.01,15.99491502,0.,0./)!TBD
+      real*8,parameter :: atomic_mass(18) = (/1.00782522,0.,0.,0.,0.,12.01,14.01,15.99491502,0.,0.,&
+                                                0.,0.,0.,0.,0.,0.,0.,39.95/)!TBD
 
       !Atom information
       integer               :: Natoms
@@ -47,6 +48,8 @@ module molecule
                         Z_mol(i) = 7
                   elseif(S_mol(i)=="O") then
                         Z_mol(i) = 8
+                  elseif(S_mol(i)=="Ar" .or.S_mol(i)=="AR" .or. S_mol(i)=="ar") then
+                        Z_mol(i) = 18
                   else
                         write(*,*)"Parsing: atom not recognized"
                   endif
