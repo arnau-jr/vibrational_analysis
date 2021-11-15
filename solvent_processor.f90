@@ -522,7 +522,7 @@ module solvent_processor
                                           k = pair_coefs(1,i,j)
                                           r0 = pair_coefs(2,i,j)
                                           solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
-                                          - k*distv
+                                          + k*distv
 
                                           solvent_U(j,i,mol) = solvent_U(j,i,mol) &
                                           + 0.5d0*k*(dist-r0)**2
