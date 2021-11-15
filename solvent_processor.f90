@@ -417,6 +417,8 @@ module solvent_processor
                   allocate(pair_coefs(2,Natoms_per_mol,Natoms_central))
             elseif(pot_type=="BU") then
                   allocate(pair_coefs(3,Natoms_per_mol,Natoms_central))
+            elseif(pot_type=="H") then
+                  allocate(pair_coefs(2,Natoms_per_mol,Natoms_central))
             else
                   print*,"Pair potential not supported, aborting..."
                   stop
@@ -440,6 +442,14 @@ module solvent_processor
                         if(units=="KC") then
                               pair_coefs(1,a,b) = pair_coefs(1,a,b)*solvent_kcal_to_kj
                               pair_coefs(3,a,b) = pair_coefs(3,a,b)*solvent_kcal_to_kj
+                        end if
+                  end if
+                  if(pot_type=="H") then
+                        read(unit,*)a,b,aux1,aux2
+                        pair_coefs(:,a,b) = (/aux1,aux2/)
+                        !Correct units if necessary
+                        if(units=="KC") then
+                              pair_coefs(1,a,b) = pair_coefs(1,a,b)*solvent_kcal_to_kj
                         end if
                   end if
             end do
@@ -469,6 +479,7 @@ module solvent_processor
             real*8             :: distv(3),dist
             real*8             :: epsilon,sigma
             real*8             :: Abu,bbu,Cbu
+            real*8             :: k,r0
             integer            :: i,j,mol
 
             
@@ -507,6 +518,14 @@ module solvent_processor
 
                                           solvent_U(j,i,mol) = solvent_U(j,i,mol) &
                                           + Abu*exp(-bbu*dist) - Cbu/dist**6
+                                    else if(pair_pot_type=="H") then
+                                          k = pair_coefs(1,i,j)
+                                          r0 = pair_coefs(2,i,j)
+                                          solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
+                                          - k*distv
+
+                                          solvent_U(j,i,mol) = solvent_U(j,i,mol) &
+                                          + 0.5d0*k*(dist-r0)**2
                                     end if
                               end if    
                         end do
