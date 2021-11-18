@@ -6,8 +6,8 @@ module solvent_processor
       implicit none 
 
       !Constants and parameters
-      real*8,parameter :: solvent_atomic_mass(18) = (/1.00782522,0.,0.,0.,0.,12.01,14.01,15.99491502,0.,0.,&
-                                                0.,0.,0.,0.,0.,0.,0.,39.95/)!TBD
+      real*8,parameter :: solvent_atomic_mass(18) = (/1.00782522d0,0.d0,0.d0,0.d0,0.d0,12.01d0,14.01d0,15.99491502d0,0.d0,0.d0,&
+                                                0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,39.95d0/)!TBD
       real*8,parameter :: solvent_kcal_to_kj = 4.184d0
       real*8,parameter :: electrostatic_constant = 1389.374205 !kJ/mol Angs
 
