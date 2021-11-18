@@ -336,10 +336,10 @@ module solvent_processor
             U(3,3) = q0**2 - q1**2 - q2**2 + q3**2
       end function solvent_build_direction_cosine_matrix
 
-      subroutine check_eckart_conditions()
+      subroutine solvent_check_eckart_conditions()
             implicit none
             real*8           :: tra_cond(3),rot_cond(3),comb_cond(3),disp(3,Natoms_per_mol)
-            real*8,parameter :: eps=1.d-10
+            real*8,parameter :: eps=1.d-7
             integer          :: i,mol
             do mol=1,Nmols
                   disp = solvent_xyz_cm(:,:,mol) - solvent_xyz_eckart(:,:,mol)
@@ -363,7 +363,7 @@ module solvent_processor
                         print*,""
                   end if
             end do
-      end subroutine check_eckart_conditions
+      end subroutine solvent_check_eckart_conditions
 
 
       subroutine solvent_get_eckart_frame()
@@ -385,7 +385,7 @@ module solvent_processor
                   end do
                   solvent_U_eckart(:,:,mol) = U
             end do
-            call check_eckart_conditions()
+            call solvent_check_eckart_conditions()
       end subroutine solvent_get_eckart_frame
 
 
@@ -493,15 +493,15 @@ module solvent_processor
                               dist = sqrt(sum(distv**2))
                               if(dist>L_box) print*,"WARNING: distance greater than box length"
 
-                              !Coulomb part
-                              solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
-                              + distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**3
-
-                              solvent_U(j,i,mol) = solvent_U(j,i,mol) &
-                              + electrostatic_constant*q_solvent(i)*q_central(j)/dist
-
-                              !Pair part
                               if(dist<pair_cut) then
+                                    !Coulomb part
+                                    solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
+                                    + distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**3
+
+                                    solvent_U(j,i,mol) = solvent_U(j,i,mol) &
+                                    + electrostatic_constant*q_solvent(i)*q_central(j)/dist
+                                    
+                                    !Pair part
                                     if(pair_pot_type=="LJ") then
                                           epsilon = pair_coefs(1,i,j)
                                           sigma = pair_coefs(2,i,j)
