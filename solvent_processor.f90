@@ -479,7 +479,7 @@ module solvent_processor
             real*8             :: distv(3),dist
             real*8             :: epsilon,sigma
             real*8             :: Abu,bbu,Cbu
-            real*8             :: k,r0
+            real*8             :: k,r0,r0v(3)
             integer            :: i,j,mol
 
             
@@ -491,6 +491,7 @@ module solvent_processor
                               distv = solvent_xyz_mol(:,i,mol)-xyz_central(:,j)
                               distv = distv-L_box*nint(distv/L_box)
                               dist = sqrt(sum(distv**2))
+                              if(dist>L_box) print*,"WARNING: distance greater than box length"
 
                               !Coulomb part
                               solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
@@ -521,8 +522,9 @@ module solvent_processor
                                     else if(pair_pot_type=="H") then
                                           k = pair_coefs(1,i,j)
                                           r0 = pair_coefs(2,i,j)
-                                          solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
-                                          + k*distv
+                                          r0v = (/r0,0.d0,0.d0/)
+                                          solvent_F(1,j,i,mol) = solvent_F(1,j,i,mol) &
+                                          + k*(dist - r0)
 
                                           solvent_U(j,i,mol) = solvent_U(j,i,mol) &
                                           + 0.5d0*k*(dist-r0)**2
