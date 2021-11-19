@@ -9,7 +9,7 @@ module solvent_processor
       real*8,parameter :: solvent_atomic_mass(18) = (/1.00782522d0,0.d0,0.d0,0.d0,0.d0,12.01d0,14.01d0,15.99491502d0,0.d0,0.d0,&
                                                 0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,39.95d0/)!TBD
       real*8,parameter :: solvent_kcal_to_kj = 4.184d0
-      real*8,parameter :: electrostatic_constant = 1389.374205 !kJ/mol Angs
+      real*8,parameter :: electrostatic_constant = 1389.3502 !kJ/mol Angs
 
       !Atom information
       integer               :: Nmols,Natoms_per_mol,solvent_Natoms
