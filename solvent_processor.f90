@@ -37,7 +37,7 @@ module solvent_processor
       integer            :: Natoms_central
       character          :: pair_pot_type*90
       real*8,allocatable :: pair_coefs(:,:,:) !(coef,solvent types,central types)
-      real*8             :: pair_cut
+      real*8             :: pair_cut,long_cut
       real*8,allocatable :: q_solvent(:),q_central(:)
       real*8,allocatable :: solvent_F(:,:,:,:),solvent_U(:,:,:) 
       !(i,j,k,l) component i that atom j of the central molecule does on atom k of molecule l
@@ -455,7 +455,7 @@ module solvent_processor
             end do
             read(unit,*,end=10) !Check if end file, blank line should be there if continuing
 
-            read(unit,*)dummy
+            read(unit,*)dummy,long_cut
             read(unit,*)dummy
             allocate(q_solvent(Natoms_per_mol))
             do i=1,Natoms_per_mol
@@ -493,15 +493,16 @@ module solvent_processor
                               dist = sqrt(sum(distv**2))
                               if(dist>L_box) print*,"WARNING: distance greater than box length"
 
-                              if(dist<pair_cut) then
-                                    !Coulomb part
+                              !Coulomb part
+                              if(dist<long_cut) then
                                     solvent_F(:,j,i,mol) = solvent_F(:,j,i,mol) &
                                     + distv*electrostatic_constant*q_solvent(i)*q_central(j)/dist**3
 
                                     solvent_U(j,i,mol) = solvent_U(j,i,mol) &
                                     + electrostatic_constant*q_solvent(i)*q_central(j)/dist
-                                    
-                                    !Pair part
+                              end if
+                              !Pair part
+                              if(dist<pair_cut) then
                                     if(pair_pot_type=="LJ") then
                                           epsilon = pair_coefs(1,i,j)
                                           sigma = pair_coefs(2,i,j)
