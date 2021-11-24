@@ -132,19 +132,17 @@ module solvent_processor
       end subroutine solvent_update_cm_vel
 
 
-      subroutine init_solvent(Nmolecules,Nat,Ncentral,l,uniteq)
+      subroutine init_solvent(Nmolecules,Nat,Ncentral,uniteq)
             implicit none
             integer,intent(in) :: Nmolecules,Nat,Ncentral
-            real*8,intent(in)  :: l
             integer,intent(in) :: uniteq
-            integer            :: mol,i
-            character          :: dummy*90
+            integer            :: i
 
             Nmols = Nmolecules
             Natoms_central = Ncentral
             Natoms_per_mol = Nat
             solvent_Natoms = Natoms_per_mol*Nmols
-            L_box = l
+            L_box = 0.d0
             !Allocate quantities
             allocate(solvent_S_mol(Natoms_per_mol),solvent_M_mol(Natoms_per_mol),solvent_Z_mol(Natoms_per_mol))
             allocate(solvent_xyz_mol(3,Natoms_per_mol,Nmols),solvent_xyz_cm(3,Natoms_per_mol,Nmols))
@@ -157,7 +155,7 @@ module solvent_processor
             allocate(solvent_Fcentral(3,Natoms_central,Natoms_per_mol,Nmols))
 
             solvent_xyz_mol = 0.d0
-            
+
             !Get equilibrium coordinates
             read(uniteq,*)
             read(uniteq,*)
