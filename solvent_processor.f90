@@ -50,7 +50,7 @@ module solvent_processor
       subroutine solvent_parse_atomic_symbol()
             implicit none
             integer :: i
-            do i=1,solvent_Natoms
+            do i=1,Natoms_per_mol
                   if(solvent_S_mol(i)=="H") then
                         solvent_Z_mol(i) = 1
                   elseif(solvent_S_mol(i)=="C") then
@@ -89,9 +89,9 @@ module solvent_processor
 
                   total_mass = 0.d0
                   do i=1,Natoms_per_mol
-                        total_mass = total_mass + solvent_M_mol(Natoms_per_mol*(mol-1)+i)
+                        total_mass = total_mass + solvent_M_mol(i)
                         solvent_cm_pos(:,mol) = solvent_cm_pos(:,mol) + &
-                        solvent_M_mol(Natoms_per_mol*(mol-1)+i)*xyz_aux(:,i)
+                        solvent_M_mol(i)*xyz_aux(:,i)
                   end do
                   solvent_cm_pos(:,mol) = solvent_cm_pos(:,mol)/total_mass
                   do i=1,Natoms_per_mol
@@ -107,7 +107,7 @@ module solvent_processor
             K = 0.d0
             do mol=1,Nmols
                   do i=1,Natoms_per_mol
-                        K = K + 0.5d0*solvent_M_mol(Natoms_per_mol*(mol-1)+i)*sum(solvent_vel_mol(:,i,mol)**2)
+                        K = K + 0.5d0*solvent_M_mol(i)*sum(solvent_vel_mol(:,i,mol)**2)
                   end do
             end do
       end function solvent_comp_kinetic_energy
@@ -120,9 +120,9 @@ module solvent_processor
             do mol=1,Nmols
                   total_mass=0.d0
                   do i=1,Natoms_per_mol
-                        total_mass = total_mass + solvent_M_mol(Natoms_per_mol*(mol-1)+i)
+                        total_mass = total_mass + solvent_M_mol(i)
                         solvent_cm_vel(:,mol) = solvent_cm_vel(:,mol) + &
-                        solvent_M_mol(Natoms_per_mol*(mol-1)+i)*solvent_vel_mol(:,i,mol)
+                        solvent_M_mol(i)*solvent_vel_mol(:,i,mol)
                   end do
                   solvent_cm_vel(:,mol) = solvent_cm_vel(:,mol)/total_mass
                   do i=1,Natoms_per_mol
@@ -132,11 +132,11 @@ module solvent_processor
       end subroutine solvent_update_cm_vel
 
 
-      subroutine init_solvent(Nmolecules,Nat,Ncentral,l,unitini,uniteq)
+      subroutine init_solvent(Nmolecules,Nat,Ncentral,l,uniteq)
             implicit none
             integer,intent(in) :: Nmolecules,Nat,Ncentral
             real*8,intent(in)  :: l
-            integer,intent(in) :: unitini,uniteq
+            integer,intent(in) :: uniteq
             integer            :: mol,i
             character          :: dummy*90
 
@@ -146,7 +146,7 @@ module solvent_processor
             solvent_Natoms = Natoms_per_mol*Nmols
             L_box = l
             !Allocate quantities
-            allocate(solvent_S_mol(solvent_Natoms),solvent_M_mol(solvent_Natoms),solvent_Z_mol(solvent_Natoms))
+            allocate(solvent_S_mol(Natoms_per_mol),solvent_M_mol(Natoms_per_mol),solvent_Z_mol(Natoms_per_mol))
             allocate(solvent_xyz_mol(3,Natoms_per_mol,Nmols),solvent_xyz_cm(3,Natoms_per_mol,Nmols))
             allocate(solvent_xyz_eq(3,Natoms_per_mol),solvent_xyz_eckart(3,Natoms_per_mol,Nmols),solvent_cm_pos(3,Nmols))
             allocate(solvent_vel_mol(3,Natoms_per_mol,Nmols),solvent_vel_cm(3,Natoms_per_mol,Nmols))
@@ -155,31 +155,25 @@ module solvent_processor
             allocate(solvent_F(3,Natoms_central,Natoms_per_mol,Nmols),solvent_U(Natoms_central,Natoms_per_mol,Nmols))
             allocate(solvent_PT(Nmols),solvent_PR(Nmols))
             allocate(solvent_Fcentral(3,Natoms_central,Natoms_per_mol,Nmols))
-            !Read initial configuration
-            do i=1,9
-                  read(unitini,*)
+
+            solvent_xyz_mol = 0.d0
+            
+            !Get equilibrium coordinates
+            read(uniteq,*)
+            read(uniteq,*)
+            do i=1,Natoms_per_mol
+                  read(uniteq,*)solvent_S_mol(i),solvent_xyz_eq(:,i)
             end do
-            do mol=1,Nmols
-                  do i=1,Natoms_per_mol
-                        read(unitini,*)solvent_S_mol(Natoms_per_mol*(mol-1)+i),solvent_xyz_mol(:,i,mol),solvent_vel_mol(:,i,mol)
-                  end do
-            end do
+            solvent_eq_cm_pos = 0.d0
             
             solvent_vel_cm = 0.d0
             solvent_vel_vib = 0.d0
 
             !Get masses from symbols
             call solvent_parse_atomic_symbol()
-            !Obtain equilibrium CoM coordinates
+            !Obtain CoM coordinates
             call solvent_update_cm_coords()
             call solvent_update_cm_vel()
-           
-            read(uniteq,*)
-            read(uniteq,*)
-            do i=1,Natoms_per_mol
-                  read(uniteq,*)dummy,solvent_xyz_eq(:,i)
-            end do
-            solvent_eq_cm_pos = 0.d0
       end subroutine init_solvent
 
       function solvent_build_pseudo_inertia_moment(mol) result(I)
@@ -191,7 +185,7 @@ module solvent_processor
 
             delta_term = 0.d0
             do j=1,Natoms_per_mol
-                  delta_term = delta_term + solvent_M_mol(Natoms_per_mol*(mol-1)+j)*&
+                  delta_term = delta_term + solvent_M_mol(j)*&
                   sum(solvent_xyz_eckart(:,j,mol)*solvent_xyz_cm(:,j,mol))
             end do
 
@@ -200,7 +194,7 @@ module solvent_processor
                   do b=1,Natoms_per_mol
                         if(a==b) I(a,b) = I(a,b) + delta_term
                         do j=1,Natoms_per_mol
-                              I(a,b) = I(a,b) - solvent_M_mol(Natoms_per_mol*(mol-1)+j)*&
+                              I(a,b) = I(a,b) - solvent_M_mol(j)*&
                               solvent_xyz_cm(a,j,mol)*solvent_xyz_eckart(b,j,mol)
                         end do
                   end do
@@ -244,7 +238,7 @@ module solvent_processor
             integer :: i
             l = 0.d0
             do i=1,Natoms_per_mol
-                  l = l + solvent_M_mol(Natoms_per_mol*(mol-1)+i)*&
+                  l = l + solvent_M_mol(i)*&
                   solvent_cross_product(solvent_xyz_eckart(:,i,mol),solvent_vel_mol(:,i,mol))
             end do
       end function solvent_comp_pseudo_angular_moment
@@ -347,10 +341,10 @@ module solvent_processor
                   rot_cond = 0.d0
                   comb_cond = 0.d0
                   do i=1,Natoms_per_mol
-                        tra_cond  = tra_cond  + solvent_M_mol(Natoms_per_mol*(mol-1)+i)*disp(:,i)
-                        rot_cond  = rot_cond  + solvent_M_mol(Natoms_per_mol*(mol-1)+i)*&
+                        tra_cond  = tra_cond  + solvent_M_mol(i)*disp(:,i)
+                        rot_cond  = rot_cond  + solvent_M_mol(i)*&
                         solvent_cross_product(solvent_xyz_eckart(:,i,mol),disp(:,i))
-                        comb_cond = comb_cond + solvent_M_mol(Natoms_per_mol*(mol-1)+i)*&
+                        comb_cond = comb_cond + solvent_M_mol(i)*&
                         solvent_cross_product(solvent_xyz_eckart(:,i,mol),solvent_xyz_cm(:,i,mol))
                   end do
 
@@ -628,7 +622,7 @@ module solvent_processor
             write(port,*)""
             do mol=1,Nmols
                   do i=1,Natoms_per_mol
-                        write(port,"(A,2X,E20.10,2X,E20.10,2X,E20.10)")solvent_S_mol(Natoms_per_mol*(i-1)+i),r(:,i,mol)
+                        write(port,"(A,2X,E20.10,2X,E20.10,2X,E20.10)")solvent_S_mol(i),r(:,i,mol)
                   end do
             enddo
       end subroutine solvent_write_conf
@@ -644,7 +638,7 @@ module solvent_processor
             write(port,*)""
             do mol=1,Nmols
                   do i=1,Natoms_per_mol
-                        write(port,"(A,2X,E20.10,2X,E20.10,2X,E20.10)")solvent_S_mol(Natoms_per_mol*(mol-1)+i),r(:,i,mol)
+                        write(port,"(A,2X,E20.10,2X,E20.10,2X,E20.10)")solvent_S_mol(i),r(:,i,mol)
                   end do
             enddo
             do i=1,Natoms_central
