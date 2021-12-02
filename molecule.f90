@@ -148,7 +148,7 @@ module molecule
             write(port,"(I5)")Natoms
             write(port,*)""
             do i=1,Natoms
-                  write(port,"(A,2X,E20.10,2X,E20.10,2X,E20.10)")S_mol(i),r(:,i)
+                  write(port,"(A,2X,E20.13,2X,E20.13,2X,E20.13)")S_mol(i),r(:,i)
             enddo
       end
 
