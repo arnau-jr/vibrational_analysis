@@ -331,7 +331,7 @@ module solvent_processor
       subroutine solvent_check_eckart_conditions()
             implicit none
             real*8           :: tra_cond(3),rot_cond(3),comb_cond(3),disp(3,Natoms_per_mol)
-            real*8,parameter :: eps=1.d-7
+            real*8,parameter :: eps=1.d-10
             integer          :: i,mol
             do mol=1,Nmols
                   disp = solvent_xyz_cm(:,:,mol) - solvent_xyz_eckart(:,:,mol)
