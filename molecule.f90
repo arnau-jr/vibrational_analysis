@@ -135,7 +135,7 @@ module molecule
             xyz_eq = xyz_cm
             eq_cm_pos = cm_pos
 
-            write(normal_format_label,"(A,I2,A)")"(I5,2X,",3*Natoms,"(E14.7,2X))"
+            write(normal_format_label,"(A,I2,A)")"(E20.13,2X,",3*Natoms,"(E20.13,2X))"
       end subroutine init_molecule
 
 
