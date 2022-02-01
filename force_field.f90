@@ -272,7 +272,7 @@ module force_field
             endif
       end function comp_torsion
 
-      function comp_improper(c4,c1,c3,c2) result(T)
+      function comp_improper(c1,c2,c3,c4) result(T)
             implicit none
             real*8 :: c1(3),c2(3),c3(3),c4(3)
             real*8 :: u12(3),u23(3),u32(3),u43(3)
