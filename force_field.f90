@@ -53,7 +53,6 @@ module force_field
             !Read stretching info
             read(unit,*)Nbonds
             read(unit,*)units
-            call upcase(units)
 
             allocate(bond_pairs(2,Nbonds),bond_vals(Nbonds))
             allocate(bond_coefs(3,Nbonds),bond_types(Nbonds))
@@ -63,13 +62,13 @@ module force_field
                   read(unit,*)dummy,dummy,pot_type,dummy
                   backspace(unit)
 
-                  call upcase(pot_type)
                   bond_types(i) = pot_type
 
                   select case(bond_types(i))
-                        case("HARMONIC")
+                        case("QUADRATIC")
                               read(unit,*)a,b,dummy,bond_coefs(1,i),bond_coefs(2,i)
                               select case(units)
+                                    case("KJ")
                                     case("KC")
                                           bond_coefs(1,i) = bond_coefs(1,i)*kcal_to_kj
                                     case("CM")
@@ -81,6 +80,7 @@ module force_field
                         case("MORSE")
                               read(unit,*)a,b,dummy,bond_coefs(1,i),bond_coefs(2,i),bond_coefs(3,i)
                               select case(units)
+                                    case("KJ")
                                     case("KC")
                                           bond_coefs(1,i) = bond_coefs(1,i)*kcal_to_kj
                                     case("CM")
@@ -100,7 +100,6 @@ module force_field
             !Read bending info
             read(unit,*)Nangles
             read(unit,*)units
-            call upcase(units)
 
             allocate(angle_pairs(3,Nangles),angle_vals(Nangles))
             allocate(angle_coefs(3,Nangles),angle_types(Nangles))
@@ -110,12 +109,12 @@ module force_field
                   read(unit,*)dummy,dummy,dummy,pot_type,dummy
                   backspace(unit)
 
-                  call upcase(pot_type)
                   angle_types(i) = pot_type
                   select case(angle_types(i))
-                        case("HARMONIC")
+                        case("QUADRATIC")
                               read(unit,*)a,b,c,dummy,angle_coefs(1,i),angle_coefs(2,i)
                               select case(units)
+                                    case("KJ")
                                     case("KC")
                                           angle_coefs(1,i) = angle_coefs(1,i)*kcal_to_kj
                                     case("CM")
@@ -135,7 +134,6 @@ module force_field
             !Read torsion info
             read(unit,*)Ntorsions
             read(unit,*)units
-            call upcase(units)
 
             allocate(torsion_pairs(4,Ntorsions),torsion_vals(Ntorsions))
             allocate(torsion_coefs(3,Ntorsions),torsion_types(Ntorsions))
@@ -144,12 +142,36 @@ module force_field
                   read(unit,*)dummy,dummy,dummy,dummy,pot_type,dummy
                   backspace(unit)
 
-                  call upcase(pot_type)
                   torsion_types(i) = pot_type
                   select case(torsion_types(i))
-                        case("COSINE")
+                        case("DQUADRATIC")
                               read(unit,*)a,b,c,d,dummy,torsion_coefs(1,i),torsion_coefs(2,i)
                               select case(units)
+                                    case("KJ")
+                                    case("KC")
+                                          torsion_coefs(1,i) = torsion_coefs(1,i)*kcal_to_kj
+                                    case("CM")
+                                          torsion_coefs(1,i) = torsion_coefs(1,i)*cm_to_kj
+                                    case default
+                                          print*,"Unrecognized units, aborting..."
+                                          stop
+                        end select
+                        case("COSINE")
+                              read(unit,*)a,b,c,d,dummy,torsion_coefs(1,i),torsion_coefs(2,i),torsion_coefs(3,i)
+                              select case(units)
+                                    case("KJ")
+                                    case("KC")
+                                          torsion_coefs(1,i) = torsion_coefs(1,i)*kcal_to_kj
+                                    case("CM")
+                                          torsion_coefs(1,i) = torsion_coefs(1,i)*cm_to_kj
+                                    case default
+                                          print*,"Unrecognized units, aborting..."
+                                          stop
+                              end select
+                        case("DCOSMULT2")
+                              read(unit,*)a,b,c,d,dummy,torsion_coefs(1,i),torsion_coefs(2,i)
+                              select case(units)
+                                    case("KJ")
                                     case("KC")
                                           torsion_coefs(1,i) = torsion_coefs(1,i)*kcal_to_kj
                                     case("CM")
@@ -316,7 +338,7 @@ module force_field
             E = 0.
             do i=1,Nbonds
                   select case(bond_types(i))
-                        case("HARMONIC")
+                        case("QUADRATIC")
                               k = bond_coefs(1,i)
                               req = bond_coefs(2,i)
                               E = E + k*(bond_vals(i)-req)**2
@@ -337,7 +359,7 @@ module force_field
             E = 0.
             do i=1,Nangles
                   select case(angle_types(i))
-                        case("HARMONIC")
+                        case("QUADRATIC")
                               k = angle_coefs(1,i)
                               aeq = angle_coefs(2,i)
                               E = E + k*((pi/180.d0)*(angle_vals(i)-aeq))**2
@@ -348,11 +370,19 @@ module force_field
 
       real*8 function comp_torsions_energy() result(E)
             implicit none
+            real*8  :: k,deq
             real*8  :: An,n,delta
             integer :: i
             E = 0.
             do i=1,Ntorsions
                   select case(torsion_types(i))
+                        case("DQUADRATIC")
+                              k = torsion_coefs(1,i)
+                              deq = torsion_coefs(2,i)
+                              delta = torsion_vals(i)-deq
+                              if(delta> pi) delta =delta -2.*pi
+                              if(delta<-pi) delta =delta +2.*pi
+                              E = E + k*((pi/180.d0)*delta)**2
                         case("COSINE")
                               An = torsion_coefs(1,i)
                               delta = torsion_coefs(2,i)
