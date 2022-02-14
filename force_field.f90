@@ -38,7 +38,7 @@ module force_field
             integer,intent(in) :: unit,Natoms
             real*8,intent(in)  :: xyz(3,Natoms)
             character          :: dummy*90,units*90,pot_type*90
-            integer            :: i,a,b,c,d,dummy2
+            integer            :: i,a,b,c,d
 
             if(Natoms == 0) then
                   print*,"Molecule has 0 atoms, not initialized correctly, aborting..."
@@ -252,13 +252,6 @@ module force_field
             proj = sum(u1232*u2343)
             proj2 = sum(u1232*u43)
 
-            ! if(proj>=1.d0) then
-            !       T = 180.d0
-            ! elseif(proj<=-1.d0) then
-            !       T = 180.d0 - 180.d0*sign(1.d0,proj2)
-            ! else
-            !       T = 180.d0 - (180.d0/pi)*sign(1.d0,proj2)*acos(proj)
-            ! endif
             if(proj>=1.d0) then
                   T = 0.d0*sign(1.d0,-proj2)
             elseif(proj<=-1.d0) then
@@ -267,40 +260,6 @@ module force_field
                   T = (180.d0/pi)*sign(1.d0,-proj2)*acos(proj)
             endif
       end function comp_torsion
-
-      function comp_improper(c1,c2,c3,c4) result(T)
-            implicit none
-            real*8 :: c1(3),c2(3),c3(3),c4(3)
-            real*8 :: u12(3),u23(3),u32(3),u43(3)
-            real*8 :: u1232(3),u2343(3)
-            real*8 :: proj,proj2
-            real*8 :: T
-
-            u12 = c2-c1
-            u23 = c3-c2
-            u32 = c2-c3
-            u43 = c3-c4
-
-            u12 = u12/sqrt(sum(u12**2))
-            u23 = u23/sqrt(sum(u23**2))
-            u32 = u32/sqrt(sum(u32**2))
-            u43 = u43/sqrt(sum(u43**2))
-
-            u1232 = unit_cross(u12,u32)
-            u2343 = unit_cross(u23,u43)
-            
-            proj = sum(u1232*u2343)
-            proj2 = sum(u1232*u43)
-            ! proj2 = -1.d0
-
-            if(proj>=1.d0) then
-                  T = 0.d0*sign(1.d0,-proj2)
-            elseif(proj<=-1.d0) then
-                  T = 180.d0*sign(1.d0,-proj2)
-            else
-                  T = (180.d0/pi)*sign(1.d0,-proj2)*acos(proj)
-            endif
-      end function comp_improper
 
       subroutine comp_bonds(Natoms,xyz)
             implicit none
@@ -340,20 +299,6 @@ module force_field
             enddo
       end subroutine comp_torsions
 
-      subroutine comp_impropers(Natoms,xyz)
-            implicit none
-            integer,intent(in) :: Natoms
-            real*8,intent(in)  :: xyz(3,Natoms)
-            integer            :: improper
-
-            do improper=1,Nimpropers
-                  improper_vals(improper) = comp_improper(xyz(:,improper_pairs(1,improper)),&
-                  xyz(:,improper_pairs(2,improper)),&
-                  xyz(:,improper_pairs(3,improper)),&
-                  xyz(:,improper_pairs(4,improper)))
-            enddo
-      end subroutine comp_impropers
-
       subroutine comp_all(Natoms,xyz)
             implicit none
             integer,intent(in) :: Natoms
@@ -361,7 +306,6 @@ module force_field
             call comp_bonds    (Natoms,xyz)
             call comp_angles   (Natoms,xyz)
             call comp_torsions (Natoms,xyz)
-            call comp_impropers(Natoms,xyz)
       end subroutine comp_all
 
       real*8 function comp_bonds_energy() result(E)
@@ -370,21 +314,19 @@ module force_field
             real*8  :: De,beta
             integer :: i
             E = 0.
-            if(pot_types(1)=="H") then
-                  do i=1,Nbonds
-                        k = harmonic_stretching(1,i)
-                        req = harmonic_stretching(2,i)
-                        E = E + k*(bond_vals(i)-req)**2
-                  enddo
-            elseif(pot_types(1)=="M") then
-                  do i=1,Nbonds
-                        De = morse_stretching(1,i)
-                        beta = morse_stretching(2,i)
-                        req = morse_stretching(3,i)
-                        ! E = E + De*((1.d0-exp(-beta*(bond_vals(i)-req)))**2-1.d0)
-                        E = E + De*((1.d0-exp(-beta*(bond_vals(i)-req)))**2)
-                  enddo
-            endif
+            do i=1,Nbonds
+                  select case(bond_types(i))
+                        case("HARMONIC")
+                              k = bond_coefs(1,i)
+                              req = bond_coefs(2,i)
+                              E = E + k*(bond_vals(i)-req)**2
+                        case("MORSE")
+                              De = bond_coefs(1,i)
+                              beta = bond_coefs(2,i)
+                              req = bond_coefs(3,i)
+                              E = E + De*((1.d0-exp(-beta*(bond_vals(i)-req)))**2)
+                  end select
+            end do
       end function comp_bonds_energy
 
 
@@ -393,13 +335,14 @@ module force_field
             real*8  :: k,aeq
             integer :: i
             E = 0.
-            if(pot_types(2)=="H") then
-                  do i=1,Nangles
-                        k = harmonic_bending(1,i)
-                        aeq = harmonic_bending(2,i)
-                        E = E + k*((pi/180.d0)*(angle_vals(i)-aeq))**2
-                  enddo
-            end if
+            do i=1,Nangles
+                  select case(angle_types(i))
+                        case("HARMONIC")
+                              k = angle_coefs(1,i)
+                              aeq = angle_coefs(2,i)
+                              E = E + k*((pi/180.d0)*(angle_vals(i)-aeq))**2
+                  end select
+            end do
       end function comp_angles_energy
 
 
@@ -408,30 +351,16 @@ module force_field
             real*8  :: An,n,delta
             integer :: i
             E = 0.
-            if(pot_types(3)=="C") then
-                  do i=1,Ntorsions
-                        An = cosine_torsions(1,i)
-                        delta = cosine_torsions(2,i)
-                        n = cosine_torsions(3,i)
-                        E = E + An*(1. + cos((pi/180.d0)*(n*torsion_vals(i) - delta)))
-                  enddo
-            end if
+            do i=1,Ntorsions
+                  select case(torsion_types(i))
+                        case("COSINE")
+                              An = torsion_coefs(1,i)
+                              delta = torsion_coefs(2,i)
+                              n = torsion_coefs(3,i)
+                              E = E + An*(1. + cos((pi/180.d0)*(n*torsion_vals(i) - delta)))
+                  end select
+            end do
       end function comp_torsions_energy
-
-      real*8 function comp_impropers_energy() result(E)
-            implicit none 
-            real*8  :: An,n,delta
-            integer :: i
-            E = 0.
-            if(pot_types(4)=="C") then
-                  do i=1,Nimpropers
-                        An = cosine_impropers(1,i)
-                        delta = cosine_impropers(2,i)
-                        n = cosine_impropers(3,i)
-                        E = E + An*(1. + cos((pi/180.d0)*(n*improper_vals(i) - delta)))
-                  enddo
-            end if
-      end function comp_impropers_energy
 
       real*8 function comp_energy(Natoms,xyz,recomp_flag) result (E)
             implicit none
@@ -450,7 +379,6 @@ module force_field
             E = E + comp_bonds_energy()
             E = E + comp_angles_energy()
             E = E + comp_torsions_energy()
-            E = E + comp_impropers_energy()
       end function comp_energy
 
       function build_gradient(Natoms,xyz) result(G)
