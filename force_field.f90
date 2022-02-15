@@ -387,7 +387,10 @@ module force_field
                               An = torsion_coefs(1,i)
                               delta = torsion_coefs(2,i)
                               n = torsion_coefs(3,i)
-                              E = E + An*(1. + cos((pi/180.d0)*(n*torsion_vals(i) - delta)))
+                              E = E + An*(1.d0 + cos((pi/180.d0)*(n*torsion_vals(i) - delta)))
+                        case("DCOSMULT2")
+                              An = torsion_coefs(1,i)
+                              E = E + An*(1.d0 + cos(2.d0*torsion_vals(i) - pi))
                   end select
             end do
       end function comp_torsions_energy
