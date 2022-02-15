@@ -507,27 +507,12 @@ module vibration
                   A = sqrt(2.d0*E_array(i)/K)
 
                   if(any(kin_list==i)) then
-                        ! x1 = rand()-0.5d0
-                        ! x1 = x1/abs(x1)
-
-                        ! vq(i) = x1*sqrt(2.d0*E_array(i))
-                        ! q(i) = 0.d0
-
                         call excite_normal_mode(E_array(i),i,0.d0,1.d0)
                   else
-                        ! x1 = rand()-0.5d0
-                        ! x1 = x1/abs(x1)
-
-                        ! q(i) = micro_division(E_array(i),i)
-                        ! vq(i) = x1*sqrt(2.d0*(E_array(i) - 0.5d0*K*q(i)**2))
-
                         call excite_normal_mode(E_array(i),i,0.d0,0.d0)
                   end if
 
                   i = i + 1
             end do
-
-            ! xyz_mol = xyz_mol + normal_to_cart(q)
-            ! vel_mol = vel_mol + normal_to_cart(vq)
       end subroutine excite_normal_modes_micro
 end module vibration
