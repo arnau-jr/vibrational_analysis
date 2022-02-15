@@ -347,12 +347,12 @@ module solvent_processor
                   end do
 
                   if(any(tra_cond > eps) .or. any(rot_cond > eps) .or. any(comb_cond > eps)) then
-                        print*,"Eckart conditions not satisfied"
-                        print*,"Eckart Conditons:"
-                        print"(A,2X,3(E16.8,2X))","Translational:",tra_cond
-                        print"(A,2X,3(E16.8,2X))","Rotational:   ",rot_cond
-                        print"(A,2X,3(E16.8,2X))","Combined:     ",comb_cond
-                        print*,""
+                        write(0,*)"Eckart conditions not satisfied"
+                        write(0,*)"Eckart Conditons:"
+                        write(0,"(A,2X,3(E16.8,2X))")"Translational:",tra_cond
+                        write(0,"(A,2X,3(E16.8,2X))")"Rotational:   ",rot_cond
+                        write(0,"(A,2X,3(E16.8,2X))")"Combined:     ",comb_cond
+                        write(0,*)""
                   end if
             end do
       end subroutine solvent_check_eckart_conditions
