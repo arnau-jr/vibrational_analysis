@@ -442,7 +442,7 @@ module vibration
             else if(abs(prop_pot + prop_kin - 1.d0) > 1.d-8) then
                   print*,"Incorrect proportions in normal mode excitation, aborting..."
                   stop
-            else if(abs(prop_kin-1.d0) < 1.d-8) then
+            else if(abs(prop_kin-1.d0) < 1.d-8 .and. .not.(present(manual_sign))) then
                   vq0_vec = cart_to_normal(vel_vib)
                   vq0 = vq0_vec(nm_mode)
                   E0 = 0.5d0*vq0**2
@@ -453,7 +453,7 @@ module vibration
                   if(present(manual_sign)) then
                         q =  manual_sign*sqrt(2.d0*E*prop_pot/K)
                         vq = manual_sign*sqrt(2.d0*E*prop_kin)
-                  else
+                  else !Only accesible via prop_kin=0.d0 prop_pot=1.d0, not well made
                         x = rand()-0.5d0
                         x = x/(abs(x)+1d-8)
                         q = x*sqrt(2.d0*E*prop_pot/K)
