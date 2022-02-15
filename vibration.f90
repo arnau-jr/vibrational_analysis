@@ -20,7 +20,7 @@ module vibration
             allocate(work(1))
             call dsyev("V","U",3*Natoms,Hm,3*Natoms,d,work,-1,i)
             if(i/=0) then
-                  print*,"Something went wrong when determining Nwork, aborting..."
+                  write(0,*)"Something went wrong when determining Nwork, aborting..."
                   stop
             end if
             Nwork = int(work(1))
@@ -440,7 +440,7 @@ module vibration
                   x = x/abs(x+1d-8)
                   vq = x*sqrt(2.d0*(E - 0.5d0*K*q**2))
             else if(abs(prop_pot + prop_kin - 1.d0) > 1.d-8) then
-                  print*,"Incorrect proportions in normal mode excitation, aborting..."
+                  write(0,*)"Incorrect proportions in normal mode excitation, aborting..."
                   stop
             else if(abs(prop_kin-1.d0) < 1.d-8 .and. .not.(present(manual_sign))) then
                   vq0_vec = cart_to_normal(vel_vib)

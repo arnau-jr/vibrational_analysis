@@ -392,12 +392,12 @@ module solvent_processor
             read(unit,*)dummy,b
 
             if(Natoms_central /= a) then
-                  print*,"Number of central molecule atoms do not match, not initialized correctly, aborting..."
+                  write(0,*)"Number of central molecule atoms do not match, not initialized correctly, aborting..."
                   stop
             end if
 
             if(Natoms_per_mol /= b) then
-                  print*,"Atom types do not match atoms per molecule, not initialized correctly, aborting..."
+                  write(0,*)"Atom types do not match atoms per molecule, not initialized correctly, aborting..."
                   stop
             end if
 
@@ -412,7 +412,7 @@ module solvent_processor
             elseif(pot_type=="H") then
                   allocate(pair_coefs(2,Natoms_per_mol,Natoms_central))
             else
-                  print*,"Pair potential not supported, aborting..."
+                  write(0,*)"Pair potential not supported, aborting..."
                   stop
             end if
 
@@ -483,7 +483,7 @@ module solvent_processor
                               distv = solvent_xyz_mol(:,i,mol)-xyz_central(:,j)
                               distv = distv-L_box*nint(distv/L_box)
                               dist = sqrt(sum(distv**2))
-                              if(dist>L_box) print*,"WARNING: distance greater than box length"
+                              if(dist>L_box) write(0,*)"WARNING: distance greater than box length"
 
                               !Coulomb part
                               if(dist<long_cut) then

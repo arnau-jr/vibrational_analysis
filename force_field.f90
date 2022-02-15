@@ -41,7 +41,7 @@ module force_field
             integer            :: i,a,b,c,d
 
             if(Natoms == 0) then
-                  print*,"Molecule has 0 atoms, not initialized correctly, aborting..."
+                  write(0,*)"Molecule has 0 atoms, not initialized correctly, aborting..."
                   stop
             end if
 
@@ -74,7 +74,7 @@ module force_field
                                     case("CM")
                                           bond_coefs(1,i) = bond_coefs(1,i)*cm_to_kj
                                     case default
-                                          print*,"Unrecognized units, aborting..."
+                                          write(0,*)"Unrecognized units, aborting..."
                                           stop
                               end select
                         case("MORSE")
@@ -86,11 +86,11 @@ module force_field
                                     case("CM")
                                           bond_coefs(1,i) = bond_coefs(1,i)*cm_to_kj     
                                     case default
-                                          print*,"Unrecognized units, aborting..."
+                                          write(0,*)"Unrecognized units, aborting..."
                                           stop
                               end select
                         case default
-                              print*,"Stretching potential not supported, aborting..."
+                              write(0,*)"Stretching potential not supported, aborting..."
                               stop
                   end select
                   bond_pairs(:,i) = (/a,b/)
@@ -120,11 +120,11 @@ module force_field
                                     case("CM")
                                           angle_coefs(1,i) = angle_coefs(1,i)*cm_to_kj
                                     case default
-                                          print*,"Unrecognized units, aborting..."
+                                          write(0,*)"Unrecognized units, aborting..."
                                           stop
                               end select
                         case default
-                              print*,"Bending potential not supported, aborting..."
+                              write(0,*)"Bending potential not supported, aborting..."
                               stop
                   end select
                   angle_pairs(:,i) = (/a,b,c/)
@@ -153,7 +153,7 @@ module force_field
                                     case("CM")
                                           torsion_coefs(1,i) = torsion_coefs(1,i)*cm_to_kj
                                     case default
-                                          print*,"Unrecognized units, aborting..."
+                                          write(0,*)"Unrecognized units, aborting..."
                                           stop
                         end select
                         case("COSINE")
@@ -165,7 +165,7 @@ module force_field
                                     case("CM")
                                           torsion_coefs(1,i) = torsion_coefs(1,i)*cm_to_kj
                                     case default
-                                          print*,"Unrecognized units, aborting..."
+                                          write(0,*)"Unrecognized units, aborting..."
                                           stop
                               end select
                         case("DCOSMULT2")
@@ -177,11 +177,11 @@ module force_field
                                     case("CM")
                                           torsion_coefs(1,i) = torsion_coefs(1,i)*cm_to_kj
                                     case default
-                                          print*,"Unrecognized units, aborting..."
+                                          write(0,*)"Unrecognized units, aborting..."
                                           stop
                               end select
                         case default
-                              print*,"Torsion potential not supported, aborting..."
+                              write(0,*)"Torsion potential not supported, aborting..."
                               stop
                   end select
                   torsion_pairs(:,i) = (/a,b,c,d/)
