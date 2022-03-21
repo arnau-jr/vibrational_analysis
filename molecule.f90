@@ -150,7 +150,7 @@ module molecule
             do i=1,Natoms
                   write(port,"(A,2X,E20.13,2X,E20.13,2X,E20.13)")S_mol(i),r(:,i)
             enddo
-      end
+      end subroutine write_conf
 
 
 end module molecule
