@@ -384,6 +384,7 @@ module solvent_processor
                   end do
                   solvent_U_eckart(:,:,mol) = U
             end do
+            !$OMP END PARALLEL DO
             call solvent_check_eckart_conditions()
       end subroutine solvent_get_eckart_frame
 
