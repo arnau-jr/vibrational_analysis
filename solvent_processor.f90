@@ -3,6 +3,7 @@
 ! Author: Arnau Jurado Romero
 
 module solvent_processor
+      use OMP_LIB
       implicit none 
 
       !Constants and parameters
@@ -78,7 +79,7 @@ module solvent_processor
             total_mass = 0.d0
             solvent_cm_pos = 0.d0
             solvent_xyz_cm = 0.d0
-
+            !$OMP PARALLEL DO REDUCTION(+:solvent_cm_pos) PRIVATE(distv,xyz_aux,i)
             do mol=1,Nmols
                   xyz_aux(:,1) = solvent_xyz_mol(:,1,mol)
                   do i=2,Natoms_per_mol
@@ -98,6 +99,7 @@ module solvent_processor
                         solvent_xyz_cm(:,i,mol) = xyz_aux(:,i) - solvent_cm_pos(:,mol)
                   end do
             end do
+            !$OMP END PARALLEL DO
       end subroutine solvent_update_cm_coords
 
       function solvent_comp_kinetic_energy() result(K)
@@ -117,6 +119,7 @@ module solvent_processor
             real*8  :: total_mass
             integer :: mol,i
             solvent_cm_vel = 0.d0
+            !$OMP PARALLEL DO REDUCTION(+:solvent_cm_vel) PRIVATE(total_mass)
             do mol=1,Nmols
                   total_mass=0.d0
                   do i=1,Natoms_per_mol
@@ -129,6 +132,7 @@ module solvent_processor
                         solvent_vel_cm(:,i,mol) = solvent_vel_mol(:,i,mol) - solvent_cm_vel(:,mol)
                   end do
             end do
+            !$OMP END PARALLEL DO
       end subroutine solvent_update_cm_vel
 
 
@@ -333,6 +337,7 @@ module solvent_processor
             real*8           :: tra_cond(3),rot_cond(3),comb_cond(3),disp(3,Natoms_per_mol)
             real*8,parameter :: eps=1.d-10
             integer          :: i,mol
+            !$OMP PARALLEL DO PRIVATE(disp,tra_cond,rot_cond,comb_cond,i)
             do mol=1,Nmols
                   disp = solvent_xyz_cm(:,:,mol) - solvent_xyz_eckart(:,:,mol)
                   tra_cond = 0.d0
@@ -355,6 +360,7 @@ module solvent_processor
                         write(0,*)""
                   end if
             end do
+            !$OMP END PARALLEL DO
       end subroutine solvent_check_eckart_conditions
 
 
@@ -365,6 +371,7 @@ module solvent_processor
             integer            :: i,mol,ierror
 
             call solvent_update_cm_coords()
+            !$OMP PARALLEL DO PRIVATE(EM,U,work,d,i,ierror)
             do mol=1,Nmols
                   EM = solvent_build_eckart_matrix(mol)
 
@@ -477,6 +484,7 @@ module solvent_processor
             
             solvent_F = 0.d0
             solvent_U = 0.d0
+            !$OMP PARALLEL DO REDUCTION(+:solvent_F,solvent_U) PRIVATE(distv,dist,epsilon,sigma,Abu,bbu,Cbu,k,r0,r0v,i,j,mol)
             do mol=1,Nmols
                   do i=1,Natoms_per_mol
                         do j=1,Natoms_central
@@ -526,6 +534,7 @@ module solvent_processor
                         end do
                   end do
             end do
+            !$OMP END PARALLEL DO
       end subroutine comp_forces_on_solvent
 
       subroutine comp_forces_on_central(xyz_central)
@@ -591,8 +600,9 @@ module solvent_processor
 
             solvent_PT = 0.d0
             solvent_PR = 0.d0
-            do j=1,Natoms_central
-                  do mol=1,Nmols
+            !$OMP PARALLEL DO REDUCTION(+:solvent_PT,solvent_PR) PRIVATE(total_F,distv,vrot,i,j)
+            do mol=1,Nmols
+                  do j=1,Natoms_central
                         total_F = sum(solvent_F(:,j,:,mol),2)
 
                         solvent_PT(mol) = solvent_PT(mol) + sum(total_F*solvent_cm_vel(:,mol))
@@ -607,6 +617,7 @@ module solvent_processor
                         end do
                   end do
             end do
+            !$OMP END PARALLEL DO
       end subroutine comp_power_on_solvent
 
 
