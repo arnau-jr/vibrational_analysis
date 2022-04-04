@@ -1,6 +1,6 @@
 objects = molecule.o force_field.o vibration.o solvent_processor.o
 comp = gfortran
-OPT = -fbounds-check -O3 
+OPT = -fbounds-check -O3 -fopenmp
 
 
 molecule.o: molecule.f90

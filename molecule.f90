@@ -6,8 +6,7 @@ module molecule
       implicit none 
 
       !Constants and parameters
-      real*8,parameter :: atomic_mass(18) = (/1.00782522d0,0.d0,0.d0,0.d0,0.d0,12.01d0,14.01d0,15.99491502d0,0.d0,0.d0,&
-                                                0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,39.95d0/)!TBD
+      real*8 :: atomic_mass(18)
 
       !Atom information
       integer               :: Natoms
@@ -106,10 +105,22 @@ module molecule
       end subroutine update_cm_coords_with_pbc
 
 
-      subroutine init_molecule(unit)
+      subroutine init_molecule(unit,unit_mass)
             implicit none
             integer,intent(in) :: unit
-            integer            :: i
+            integer,optional   :: unit_mass
+            integer            :: i,dummy
+
+            !If mass file present override default masses
+            if(present(unit_mass)) then
+                  do i=1,18 !This has to be modified when adding new elements
+                        read(unit_mass,*)dummy,atomic_mass(i)
+                  end do
+            else !Else use default masses
+                  !Default masses right now are for nitromethane's SRT force field
+                  atomic_mass = (/1.00782522d0,0.d0,0.d0,0.d0,0.d0,12.01d0,14.01d0,15.99491502d0,0.d0,0.d0,&
+                                                0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,0.d0,39.95d0/)
+            end if
 
             !Read number of atoms from file
             read(unit,*)Natoms

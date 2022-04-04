@@ -20,7 +20,7 @@ module vibration
             allocate(work(1))
             call dsyev("V","U",3*Natoms,Hm,3*Natoms,d,work,-1,i)
             if(i/=0) then
-                  print*,"Something went wrong when determining Nwork, aborting..."
+                  write(0,*)"Something went wrong when determining Nwork, aborting..."
                   stop
             end if
             Nwork = int(work(1))
@@ -245,12 +245,12 @@ module vibration
             end do
 
             if(any(tra_cond > eps) .or. any(rot_cond > eps) .or. any(comb_cond > eps)) then
-                  print*,"Eckart conditions not satisfied"
-                  print*,"Eckart Conditons:"
-                  print"(A,2X,3(E16.8,2X))","Translational:",tra_cond
-                  print"(A,2X,3(E16.8,2X))","Rotational:   ",rot_cond
-                  print"(A,2X,3(E16.8,2X))","Combined:     ",comb_cond
-                  print*,""
+                  write(0,*)"Eckart conditions not satisfied"
+                  write(0,*)"Eckart Conditons:"
+                  write(0,"(A,2X,3(E16.8,2X))")"Translational:",tra_cond
+                  write(0,"(A,2X,3(E16.8,2X))")"Rotational:   ",rot_cond
+                  write(0,"(A,2X,3(E16.8,2X))")"Combined:     ",comb_cond
+                  write(0,*)""
             end if
       end subroutine check_eckart_conditions
 
@@ -440,9 +440,9 @@ module vibration
                   x = x/abs(x+1d-8)
                   vq = x*sqrt(2.d0*(E - 0.5d0*K*q**2))
             else if(abs(prop_pot + prop_kin - 1.d0) > 1.d-8) then
-                  print*,"Incorrect proportions in normal mode excitation, aborting..."
+                  write(0,*)"Incorrect proportions in normal mode excitation, aborting..."
                   stop
-            else if(abs(prop_kin-1.d0) < 1.d-8) then
+            else if(abs(prop_kin-1.d0) < 1.d-8 .and. .not.(present(manual_sign))) then
                   vq0_vec = cart_to_normal(vel_vib)
                   vq0 = vq0_vec(nm_mode)
                   E0 = 0.5d0*vq0**2
@@ -453,7 +453,7 @@ module vibration
                   if(present(manual_sign)) then
                         q =  manual_sign*sqrt(2.d0*E*prop_pot/K)
                         vq = manual_sign*sqrt(2.d0*E*prop_kin)
-                  else
+                  else !Only accesible via prop_kin=0.d0 prop_pot=1.d0, not well made
                         x = rand()-0.5d0
                         x = x/(abs(x)+1d-8)
                         q = x*sqrt(2.d0*E*prop_pot/K)
@@ -507,27 +507,12 @@ module vibration
                   A = sqrt(2.d0*E_array(i)/K)
 
                   if(any(kin_list==i)) then
-                        ! x1 = rand()-0.5d0
-                        ! x1 = x1/abs(x1)
-
-                        ! vq(i) = x1*sqrt(2.d0*E_array(i))
-                        ! q(i) = 0.d0
-
                         call excite_normal_mode(E_array(i),i,0.d0,1.d0)
                   else
-                        ! x1 = rand()-0.5d0
-                        ! x1 = x1/abs(x1)
-
-                        ! q(i) = micro_division(E_array(i),i)
-                        ! vq(i) = x1*sqrt(2.d0*(E_array(i) - 0.5d0*K*q(i)**2))
-
                         call excite_normal_mode(E_array(i),i,0.d0,0.d0)
                   end if
 
                   i = i + 1
             end do
-
-            ! xyz_mol = xyz_mol + normal_to_cart(q)
-            ! vel_mol = vel_mol + normal_to_cart(vq)
       end subroutine excite_normal_modes_micro
 end module vibration

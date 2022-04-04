@@ -9,28 +9,22 @@ module force_field
       real*8,parameter :: PI = 4.d0*atan(1.d0)
 
       !Number of bonds, angles, etc.
-      integer :: Nbonds,Nangles,Ntorsions,Nimpropers
+      integer :: Nbonds,Nangles,Ntorsions
 
       !Pairs and values of each type
-      integer,allocatable :: bond_pairs(:,:),angle_pairs(:,:),torsion_pairs(:,:),improper_pairs(:,:)
-      real*8,allocatable  :: bond_vals(:),angle_vals(:),torsion_vals(:),improper_vals(:)
+      integer,allocatable :: bond_pairs(:,:),angle_pairs(:,:),torsion_pairs(:,:)
+      real*8,allocatable  :: bond_vals(:),angle_vals(:),torsion_vals(:)
+      !Coeficients and potential types
+      real*8,allocatable    :: bond_coefs(:,:),angle_coefs(:,:),torsion_coefs(:,:)
+      character,allocatable :: bond_types(:)*90,angle_types(:)*90,torsion_types(:)*90
+
       !Units are standarized to be Angstroms for bonds and degrees for the rest
       !Energy units are internally kJ/mol, so the time unit is the dps (0.1 ps)
       !(Using g/mol as mass unit, as it also standard).
 
-      !Selection of potential type, from the 4 terms we decide which type of potential
-      !it is following a one character string
-      character           :: pot_types(4)*1
-
-      !Coefficients for every type of potential supported, not all will be used at runtime
-      real*8,allocatable  :: harmonic_stretching(:,:) !Harmonic stretching (k,r)
-      real*8,allocatable  :: morse_stretching(:,:) !Morse stretching (De,beta,r)
-      real*8,allocatable  :: harmonic_bending(:,:) !Harmonic angles (k,a)
-      real*8,allocatable  :: cosine_torsions(:,:) !Cosine torsions (An,delta,n)
-      real*8,allocatable  :: cosine_impropers(:,:) !Cosine impropers (An,delta,n)
-
       !Unit conversions and other constants
       real*8,parameter :: kcal_to_kj = 4.184d0
+      real*8,parameter :: cm_to_kj = 83.5934788d0
       real*8,parameter :: R_kJ_mol_K = 8.31446261815324d-3
       real*8,parameter :: c_cm_dps = 2.99792458d-3 
       real*8,parameter :: h_cm_dps = 8065.6d0*4.135667696d-2
@@ -43,11 +37,11 @@ module force_field
             implicit none
             integer,intent(in) :: unit,Natoms
             real*8,intent(in)  :: xyz(3,Natoms)
-            character          :: dummy*90,units*90,pot_type*1
-            integer            :: i,a,b,c,d,dummy2
+            character          :: dummy*90,units*90,pot_type*90
+            integer            :: i,a,b,c,d
 
             if(Natoms == 0) then
-                  print*,"Molecule has 0 atoms, not initialized correctly, aborting..."
+                  write(0,*)"Molecule has 0 atoms, not initialized correctly, aborting..."
                   stop
             end if
 
@@ -55,121 +49,145 @@ module force_field
             Nbonds = 0
             Nangles = 0
             Ntorsions = 0
-            Nimpropers = 0
 
             !Read stretching info
             read(unit,*)Nbonds
-            read(unit,*)pot_type
             read(unit,*)units
 
             allocate(bond_pairs(2,Nbonds),bond_vals(Nbonds))
-            if(pot_type=="H") then
-                  allocate(harmonic_stretching(2,Nbonds))
-            elseif(pot_type=="M") then
-                  allocate(morse_stretching(3,Nbonds))
-            else
-                  print*,"Stretching potential not supported, aborting..."
-                  stop
-            end if
-            pot_types(1) = pot_type
+            allocate(bond_coefs(3,Nbonds),bond_types(Nbonds))
 
             !Read streching coefs
             do i=1,Nbonds
-                  if(pot_type=="H") then
-                        read(unit,*)a,b,dummy,harmonic_stretching(1,i),harmonic_stretching(2,i)
-                        !Correct units if necessary
-                        if(units=="KC") then
-                              harmonic_stretching(1,i) = harmonic_stretching(1,i)*kcal_to_kj
-                        end if
-                  elseif(pot_type=="M") then
-                        read(unit,*)a,b,dummy,morse_stretching(1,i),morse_stretching(2,i),&
-                        morse_stretching(3,i)
-                        if(units=="KC") then
-                              morse_stretching(1,i) = morse_stretching(1,i)*kcal_to_kj
-                        end if
-                  end if
+                  read(unit,*)dummy,dummy,pot_type,dummy
+                  backspace(unit)
+
+                  bond_types(i) = pot_type
+
+                  select case(bond_types(i))
+                        case("QUADRATIC")
+                              read(unit,*)a,b,dummy,bond_coefs(1,i),bond_coefs(2,i)
+                              select case(units)
+                                    case("KJ")
+                                    case("KC")
+                                          bond_coefs(1,i) = bond_coefs(1,i)*kcal_to_kj
+                                    case("CM")
+                                          bond_coefs(1,i) = bond_coefs(1,i)*cm_to_kj
+                                    case default
+                                          write(0,*)"Unrecognized units, aborting..."
+                                          stop
+                              end select
+                        case("MORSE")
+                              read(unit,*)a,b,dummy,bond_coefs(1,i),bond_coefs(2,i),bond_coefs(3,i)
+                              select case(units)
+                                    case("KJ")
+                                    case("KC")
+                                          bond_coefs(1,i) = bond_coefs(1,i)*kcal_to_kj
+                                    case("CM")
+                                          bond_coefs(1,i) = bond_coefs(1,i)*cm_to_kj     
+                                    case default
+                                          write(0,*)"Unrecognized units, aborting..."
+                                          stop
+                              end select
+                        case default
+                              write(0,*)"Stretching potential not supported, aborting..."
+                              stop
+                  end select
                   bond_pairs(:,i) = (/a,b/)
             end do
             read(unit,*,end=10) !Check if end file, blank line should be there if continuing
 
             !Read bending info
             read(unit,*)Nangles
-            read(unit,*)pot_type
             read(unit,*)units
 
             allocate(angle_pairs(3,Nangles),angle_vals(Nangles))
-            if(pot_type=="H") then
-                  allocate(harmonic_bending(2,Nangles))
-            else
-                  print*,"Bending potential not supported, aborting..."
-                  stop
-            end if
-            pot_types(2) = pot_type
+            allocate(angle_coefs(3,Nangles),angle_types(Nangles))
 
             !Read bending coefs
             do i=1,Nangles
-                  if(pot_type=="H") then
-                        read(unit,*)a,b,c,dummy,harmonic_bending(1,i),harmonic_bending(2,i)
-                        if(units=="KC") then
-                              harmonic_bending(1,i) = harmonic_bending(1,i)*kcal_to_kj
-                        endif
-                  end if
+                  read(unit,*)dummy,dummy,dummy,pot_type,dummy
+                  backspace(unit)
+
+                  angle_types(i) = pot_type
+                  select case(angle_types(i))
+                        case("QUADRATIC")
+                              read(unit,*)a,b,c,dummy,angle_coefs(1,i),angle_coefs(2,i)
+                              select case(units)
+                                    case("KJ")
+                                    case("KC")
+                                          angle_coefs(1,i) = angle_coefs(1,i)*kcal_to_kj
+                                    case("CM")
+                                          angle_coefs(1,i) = angle_coefs(1,i)*cm_to_kj
+                                    case default
+                                          write(0,*)"Unrecognized units, aborting..."
+                                          stop
+                              end select
+                        case default
+                              write(0,*)"Bending potential not supported, aborting..."
+                              stop
+                  end select
                   angle_pairs(:,i) = (/a,b,c/)
             end do
             read(unit,*,end=10)
 
             !Read torsion info
             read(unit,*)Ntorsions
-            read(unit,*)pot_type
             read(unit,*)units
 
             allocate(torsion_pairs(4,Ntorsions),torsion_vals(Ntorsions))
-            if(pot_type=="C") then
-                  allocate(cosine_torsions(3,Ntorsions))
-            else
-                  print*,"Torsion potential not supported, aborting..."
-                  stop
-            end if
-            pot_types(3) = pot_type
+            allocate(torsion_coefs(3,Ntorsions),torsion_types(Ntorsions))
 
             do i=1,Ntorsions
-                  if(pot_type=="C") then
-                        read(unit,*)a,b,c,d,dummy,dummy2,cosine_torsions(1,i),cosine_torsions(2,i),&
-                        cosine_torsions(3,i)
-                        if(units=="KC") then
-                              cosine_torsions(1,i) = cosine_torsions(1,i)*kcal_to_kj
-                        endif
-                  end if
+                  read(unit,*)dummy,dummy,dummy,dummy,pot_type,dummy
+                  backspace(unit)
+
+                  torsion_types(i) = pot_type
+                  select case(torsion_types(i))
+                        case("DQUADRATIC")
+                              read(unit,*)a,b,c,d,dummy,torsion_coefs(1,i),torsion_coefs(2,i)
+                              select case(units)
+                                    case("KJ")
+                                    case("KC")
+                                          torsion_coefs(1,i) = torsion_coefs(1,i)*kcal_to_kj
+                                    case("CM")
+                                          torsion_coefs(1,i) = torsion_coefs(1,i)*cm_to_kj
+                                    case default
+                                          write(0,*)"Unrecognized units, aborting..."
+                                          stop
+                        end select
+                        case("COSINE")
+                              read(unit,*)a,b,c,d,dummy,torsion_coefs(1,i),torsion_coefs(2,i),torsion_coefs(3,i)
+                              select case(units)
+                                    case("KJ")
+                                    case("KC")
+                                          torsion_coefs(1,i) = torsion_coefs(1,i)*kcal_to_kj
+                                    case("CM")
+                                          torsion_coefs(1,i) = torsion_coefs(1,i)*cm_to_kj
+                                    case default
+                                          write(0,*)"Unrecognized units, aborting..."
+                                          stop
+                              end select
+                        case("DCOSMULT2")
+                              read(unit,*)a,b,c,d,dummy,torsion_coefs(1,i),torsion_coefs(2,i)
+                              select case(units)
+                                    case("KJ")
+                                    case("KC")
+                                          torsion_coefs(1,i) = torsion_coefs(1,i)*kcal_to_kj
+                                    case("CM")
+                                          torsion_coefs(1,i) = torsion_coefs(1,i)*cm_to_kj
+                                    case default
+                                          write(0,*)"Unrecognized units, aborting..."
+                                          stop
+                              end select
+                        case default
+                              write(0,*)"Torsion potential not supported, aborting..."
+                              stop
+                  end select
                   torsion_pairs(:,i) = (/a,b,c,d/)
             end do
             read(unit,*,end=10)
 
-            !Read impropers info
-            read(unit,*)Nimpropers
-            read(unit,*)pot_type
-            read(unit,*)units
-
-            allocate(improper_pairs(4,Nimpropers),improper_vals(Nimpropers))
-            if(pot_type=="C") then
-                  allocate(cosine_impropers(3,Nimpropers))
-            else
-                  print*,"Improper potential not supported, aborting..."
-                  stop
-            end if
-            pot_types(4) = pot_type
-
-            do i=1,Nimpropers
-                  if(pot_type=="C") then
-                        read(unit,*)a,b,c,d,dummy,cosine_impropers(1,i),cosine_impropers(2,i),&
-                        cosine_impropers(3,i)
-                        if(units=="KC") then
-                              cosine_impropers(1,i) = cosine_impropers(1,i)*kcal_to_kj
-                        endif
-                  end if
-                  improper_pairs(:,i) = (/a,b,c,d/)
-                  ! improper_vals(i) = comp_improper(xyz(:,a),xyz(:,b),&
-                  ! xyz(:,c),xyz(:,d))
-            enddo
             10 continue
             call comp_all(Natoms,xyz)
       end subroutine init_forcefield
@@ -256,13 +274,6 @@ module force_field
             proj = sum(u1232*u2343)
             proj2 = sum(u1232*u43)
 
-            ! if(proj>=1.d0) then
-            !       T = 180.d0
-            ! elseif(proj<=-1.d0) then
-            !       T = 180.d0 - 180.d0*sign(1.d0,proj2)
-            ! else
-            !       T = 180.d0 - (180.d0/pi)*sign(1.d0,proj2)*acos(proj)
-            ! endif
             if(proj>=1.d0) then
                   T = 0.d0*sign(1.d0,-proj2)
             elseif(proj<=-1.d0) then
@@ -271,40 +282,6 @@ module force_field
                   T = (180.d0/pi)*sign(1.d0,-proj2)*acos(proj)
             endif
       end function comp_torsion
-
-      function comp_improper(c1,c2,c3,c4) result(T)
-            implicit none
-            real*8 :: c1(3),c2(3),c3(3),c4(3)
-            real*8 :: u12(3),u23(3),u32(3),u43(3)
-            real*8 :: u1232(3),u2343(3)
-            real*8 :: proj,proj2
-            real*8 :: T
-
-            u12 = c2-c1
-            u23 = c3-c2
-            u32 = c2-c3
-            u43 = c3-c4
-
-            u12 = u12/sqrt(sum(u12**2))
-            u23 = u23/sqrt(sum(u23**2))
-            u32 = u32/sqrt(sum(u32**2))
-            u43 = u43/sqrt(sum(u43**2))
-
-            u1232 = unit_cross(u12,u32)
-            u2343 = unit_cross(u23,u43)
-            
-            proj = sum(u1232*u2343)
-            proj2 = sum(u1232*u43)
-            ! proj2 = -1.d0
-
-            if(proj>=1.d0) then
-                  T = 0.d0*sign(1.d0,-proj2)
-            elseif(proj<=-1.d0) then
-                  T = 180.d0*sign(1.d0,-proj2)
-            else
-                  T = (180.d0/pi)*sign(1.d0,-proj2)*acos(proj)
-            endif
-      end function comp_improper
 
       subroutine comp_bonds(Natoms,xyz)
             implicit none
@@ -344,20 +321,6 @@ module force_field
             enddo
       end subroutine comp_torsions
 
-      subroutine comp_impropers(Natoms,xyz)
-            implicit none
-            integer,intent(in) :: Natoms
-            real*8,intent(in)  :: xyz(3,Natoms)
-            integer            :: improper
-
-            do improper=1,Nimpropers
-                  improper_vals(improper) = comp_improper(xyz(:,improper_pairs(1,improper)),&
-                  xyz(:,improper_pairs(2,improper)),&
-                  xyz(:,improper_pairs(3,improper)),&
-                  xyz(:,improper_pairs(4,improper)))
-            enddo
-      end subroutine comp_impropers
-
       subroutine comp_all(Natoms,xyz)
             implicit none
             integer,intent(in) :: Natoms
@@ -365,7 +328,6 @@ module force_field
             call comp_bonds    (Natoms,xyz)
             call comp_angles   (Natoms,xyz)
             call comp_torsions (Natoms,xyz)
-            call comp_impropers(Natoms,xyz)
       end subroutine comp_all
 
       real*8 function comp_bonds_energy() result(E)
@@ -374,21 +336,19 @@ module force_field
             real*8  :: De,beta
             integer :: i
             E = 0.
-            if(pot_types(1)=="H") then
-                  do i=1,Nbonds
-                        k = harmonic_stretching(1,i)
-                        req = harmonic_stretching(2,i)
-                        E = E + k*(bond_vals(i)-req)**2
-                  enddo
-            elseif(pot_types(1)=="M") then
-                  do i=1,Nbonds
-                        De = morse_stretching(1,i)
-                        beta = morse_stretching(2,i)
-                        req = morse_stretching(3,i)
-                        ! E = E + De*((1.d0-exp(-beta*(bond_vals(i)-req)))**2-1.d0)
-                        E = E + De*((1.d0-exp(-beta*(bond_vals(i)-req)))**2)
-                  enddo
-            endif
+            do i=1,Nbonds
+                  select case(bond_types(i))
+                        case("QUADRATIC")
+                              k = bond_coefs(1,i)
+                              req = bond_coefs(2,i)
+                              E = E + k*(bond_vals(i)-req)**2
+                        case("MORSE")
+                              De = bond_coefs(1,i)
+                              beta = bond_coefs(2,i)
+                              req = bond_coefs(3,i)
+                              E = E + De*((1.d0-exp(-beta*(bond_vals(i)-req)))**2)
+                  end select
+            end do
       end function comp_bonds_energy
 
 
@@ -397,45 +357,43 @@ module force_field
             real*8  :: k,aeq
             integer :: i
             E = 0.
-            if(pot_types(2)=="H") then
-                  do i=1,Nangles
-                        k = harmonic_bending(1,i)
-                        aeq = harmonic_bending(2,i)
-                        E = E + k*((pi/180.d0)*(angle_vals(i)-aeq))**2
-                  enddo
-            end if
+            do i=1,Nangles
+                  select case(angle_types(i))
+                        case("QUADRATIC")
+                              k = angle_coefs(1,i)
+                              aeq = angle_coefs(2,i)
+                              E = E + k*((pi/180.d0)*(angle_vals(i)-aeq))**2
+                  end select
+            end do
       end function comp_angles_energy
 
 
       real*8 function comp_torsions_energy() result(E)
             implicit none
+            real*8  :: k,deq
             real*8  :: An,n,delta
             integer :: i
             E = 0.
-            if(pot_types(3)=="C") then
-                  do i=1,Ntorsions
-                        An = cosine_torsions(1,i)
-                        delta = cosine_torsions(2,i)
-                        n = cosine_torsions(3,i)
-                        E = E + An*(1. + cos((pi/180.d0)*(n*torsion_vals(i) - delta)))
-                  enddo
-            end if
+            do i=1,Ntorsions
+                  select case(torsion_types(i))
+                        case("DQUADRATIC")
+                              k = torsion_coefs(1,i)
+                              deq = torsion_coefs(2,i)
+                              delta = torsion_vals(i)-deq
+                              if(delta> pi) delta =delta -2.*pi
+                              if(delta<-pi) delta =delta +2.*pi
+                              E = E + k*((pi/180.d0)*delta)**2
+                        case("COSINE")
+                              An = torsion_coefs(1,i)
+                              delta = torsion_coefs(2,i)
+                              n = torsion_coefs(3,i)
+                              E = E + An*(1.d0 + cos((pi/180.d0)*(n*torsion_vals(i) - delta)))
+                        case("DCOSMULT2")
+                              An = torsion_coefs(1,i)
+                              E = E + An*(1.d0 + cos(2.d0*(pi/180.d0)*torsion_vals(i) - pi))
+                  end select
+            end do
       end function comp_torsions_energy
-
-      real*8 function comp_impropers_energy() result(E)
-            implicit none 
-            real*8  :: An,n,delta
-            integer :: i
-            E = 0.
-            if(pot_types(4)=="C") then
-                  do i=1,Nimpropers
-                        An = cosine_impropers(1,i)
-                        delta = cosine_impropers(2,i)
-                        n = cosine_impropers(3,i)
-                        E = E + An*(1. + cos((pi/180.d0)*(n*improper_vals(i) - delta)))
-                  enddo
-            end if
-      end function comp_impropers_energy
 
       real*8 function comp_energy(Natoms,xyz,recomp_flag) result (E)
             implicit none
@@ -454,7 +412,6 @@ module force_field
             E = E + comp_bonds_energy()
             E = E + comp_angles_energy()
             E = E + comp_torsions_energy()
-            E = E + comp_impropers_energy()
       end function comp_energy
 
       function build_gradient(Natoms,xyz) result(G)
