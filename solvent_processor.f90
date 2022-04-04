@@ -79,7 +79,7 @@ module solvent_processor
             total_mass = 0.d0
             solvent_cm_pos = 0.d0
             solvent_xyz_cm = 0.d0
-            !$OMP PARALLEL DO REDUCTION(+:solvent_cm_pos) PRIVATE(distv,xyz_aux,i)
+            !$OMP PARALLEL DO REDUCTION(+:solvent_cm_pos) PRIVATE(total_mass,distv,xyz_aux,i)
             do mol=1,Nmols
                   xyz_aux(:,1) = solvent_xyz_mol(:,1,mol)
                   do i=2,Natoms_per_mol
