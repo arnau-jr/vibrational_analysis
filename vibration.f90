@@ -515,4 +515,44 @@ module vibration
                   i = i + 1
             end do
       end subroutine excite_normal_modes_micro
+
+      subroutine excite_normal_modes_micro_selection(E,N_list,list,kinetic_flag)
+            implicit none
+            real*8,intent(in)  :: E
+            integer,intent(in) :: N_list,list(N_list)
+            logical,intent(in) :: kinetic_flag
+            real*8             :: E_array(N_list)
+            real*8             :: q(3*Natoms),vq(3*Natoms)
+            real*8             :: x1,x2,A,K
+            integer            :: i
+
+            !Distribute E energy among 3*N-6 harmonic oscillators
+            E_array = 0.d0
+            i = 1
+            do while(i<N_list + 1)
+                  x1 = rand()
+                  x2 = rand()
+
+                  if(x2 < (1.d0-x1)**(N_list-i-1)) then
+                        E_array(i) = (E-sum(E_array))*x1
+                        i = i + 1
+                  end if
+            end do
+            E_array(N_list) = E - sum(E_array(:N_list-1))
+
+
+            i = 1
+            q = 0.d0
+            vq = 0.d0
+            do i=1,N_list
+                  K = normal_eigenvalues(list(i))
+                  A = sqrt(2.d0*E_array(i)/K)
+
+                  if(kinetic_flag) then
+                        call excite_normal_mode(E_array(i),list(i),0.d0,1.d0)
+                  else
+                        call excite_normal_mode(E_array(i),list(i),0.d0,0.d0)
+                  end if
+            end do
+      end subroutine excite_normal_modes_micro_selection
 end module vibration
