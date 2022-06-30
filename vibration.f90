@@ -426,19 +426,31 @@ module vibration
             real*8,intent(in)  :: E,prop_pot,prop_kin
             integer,intent(in) :: nm_mode
             integer,optional   :: manual_sign
-            real*8             :: q,vq,K,x,E0,vq0
-            real*8             :: q_vec(3*Natoms),vq_vec(3*Natoms),vq0_vec(3*Natoms)
+            real*8             :: q,vq,K,x,E0,Epot,q0,vq0
+            real*8             :: q_vec(3*Natoms),q0_vec(3*Natoms),vq_vec(3*Natoms),vq0_vec(3*Natoms)
+            real*8             :: disp(3,Natoms)
+            integer            :: i
 
             q_vec = 0.d0
             vq_vec = 0.d0
 
             K = normal_eigenvalues(nm_mode)
             if(prop_pot<1d-8 .and. prop_kin<1d-8) then 
+                  disp = xyz_cm - xyz_eckart
+                  do i=1,Natoms !Same deal but for the displacements
+                        disp(:,i) = matmul(U_eckart,disp(:,i))
+                  end do
+                  q0_vec = cart_to_normal(disp)
+                  q0 = q0_vec(nm_mode)
+                  E0 = 0.5d0*K*q0**2
                   q = micro_division(E,nm_mode)
+                  Epot = 0.5d0*K*q**2
+                  q = (-K*q0 + sign(sqrt(2.d0*K*(E0+Epot)),q0))/K
 
-                  x = rand()-0.5d0
-                  x = x/abs(x+1d-8)
-                  vq = x*sqrt(2.d0*(E - 0.5d0*K*q**2))
+                  vq0_vec = cart_to_normal(vel_vib)
+                  vq0 = vq0_vec(nm_mode)
+                  E0 = 0.5d0*vq0**2
+                  vq = -vq0 + sign(sqrt(2.d0*(E0 + E - Epot)),vq0)
             else if(abs(prop_pot + prop_kin - 1.d0) > 1.d-8) then
                   write(0,*)"Incorrect proportions in normal mode excitation, aborting..."
                   stop
