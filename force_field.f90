@@ -123,6 +123,18 @@ module force_field
                                           write(0,*)"Unrecognized units, aborting..."
                                           stop
                               end select
+                        case("CUBIC")
+                              read(unit,*)a,b,c,dummy,angle_coefs(1,i),angle_coefs(2,i)
+                              select case(units)
+                                    case("KJ")
+                                    case("KC")
+                                          angle_coefs(1,i) = angle_coefs(1,i)*kcal_to_kj
+                                    case("CM")
+                                          angle_coefs(1,i) = angle_coefs(1,i)*cm_to_kj
+                                    case default
+                                          write(0,*)"Unrecognized units, aborting..."
+                                          stop
+                              end select
                         case default
                               write(0,*)"Bending potential not supported, aborting..."
                               stop
@@ -363,6 +375,10 @@ module force_field
                               k = angle_coefs(1,i)
                               aeq = angle_coefs(2,i)
                               E = E + k*((pi/180.d0)*(angle_vals(i)-aeq))**2
+                        case("CUBIC")
+                              k = angle_coefs(1,i)
+                              aeq = angle_coefs(2,i)
+                              E = E + k*((pi/180.d0)*(angle_vals(i)-aeq))**3
                   end select
             end do
       end function comp_angles_energy
