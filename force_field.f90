@@ -25,7 +25,7 @@ module force_field
       !Unit conversions and other constants
       real*8,parameter :: kcal_to_kj = 4.184d0
       real*8,parameter :: cm_to_kj = 1.d0/83.5934788d0
-      real*8,parameter :: eh_to_kj = 96.48530749925793d0
+      real*8,parameter :: eh_to_kj = 2625.5002d0
       real*8,parameter :: R_kJ_mol_K = 8.31446261815324d-3
       real*8,parameter :: c_cm_dps = 2.99792458d-3 
       real*8,parameter :: h_cm_dps = 8065.6d0*4.135667696d-2
