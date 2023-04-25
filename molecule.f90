@@ -77,7 +77,7 @@ module molecule
 
       subroutine update_cm_coords_with_pbc(L_box)
             implicit none
-            real*8,intent(in) :: L_box
+            real*8,intent(in) :: L_box(3)
             real*8            :: total_mass
             real*8            :: distv(3)
             real*8            :: xyz_aux(3,Natoms)

@@ -208,7 +208,7 @@ module vibration
 
       subroutine get_eckart_frame_with_pbc(L_box)
             implicit none
-            real*8,intent(in) :: L_box
+            real*8,intent(in) :: L_box(3)
             real*8            :: EM(4,4),U(3,3)
             real*8            :: work(100),d(4)
             integer           :: i,ierror

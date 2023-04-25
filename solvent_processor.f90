@@ -26,7 +26,7 @@ module solvent_processor
       real*8             :: solvent_eq_cm_pos(3)
       real*8,allocatable :: solvent_xyz_eckart(:,:,:) !Equilibirum coordinates in the Eckart frame
       real*8,allocatable :: solvent_U_eckart(:,:,:) !Rotation matrix that transforms from the eckart frame to the original equilibrium frame
-      real*8             :: L_box !Size of the solvent box
+      real*8             :: L_box(3) !Size of the solvent box
 
       !Velocities (same as coordinates)
       real*8,allocatable :: solvent_vel_mol(:,:,:) !Instantaneous velocities
@@ -492,7 +492,7 @@ module solvent_processor
                               distv = solvent_xyz_mol(:,i,mol)-xyz_central(:,j)
                               distv = distv-L_box*nint(distv/L_box)
                               dist = sqrt(sum(distv**2))
-                              if(dist>L_box) write(0,*)"WARNING: distance greater than box length"
+                              if(any(dist>L_box)) write(0,*)"WARNING: distance greater than box length"
 
                               !Coulomb part
                               if(dist<long_cut) then
